@@ -233,6 +233,7 @@ const zhCN: Messages = {
   baseText: '基准',
   baseAreaHint: '已记住上次选择的文本。所选区域内文本完全相同的文本会改为此键。',
   manualSync: '手动同步',
+  willChange: '将更改 {n} 个',
   error: '出错了：{msg}',
   notifyResync: 'Sheetlingo：已更新 {n} 个 · 缺少 {m} 个',
   notifyConnectFirst: 'Sheetlingo：请先打开插件并连接表格。',

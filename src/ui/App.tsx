@@ -155,6 +155,7 @@ export function App() {
           }
           if (msg.source === 'sync' && (!msg.silent || msg.report.updated)) setLastApplied(Date.now());
           if (msg.silent) { if (msg.report.updated) flash(st.current.t('autoChanged', { n: msg.report.updated })); return; }
+          reportAt.current = Date.now();
           setReport({ source: msg.source, report: msg.report });
           break;
         }
@@ -234,6 +235,13 @@ export function App() {
   useEffect(() => {
     if ((pendingSame || lastLinked) && areaSelected) setScope('selection');
   }, [sel.sig, !!pendingSame, !!lastLinked]);
+
+  // Results belong to the apply that produced them: clear when the selection / area / base changes
+  const reportAt = useRef(0);
+  useEffect(() => {
+    if (Date.now() - reportAt.current < 1500) return; // the apply itself updates selection/keys — keep its result
+    setReport(null);
+  }, [sel.sig, scope, liveSame?.key]);
 
   // Target preview for "Apply": which layers / how many texts the current scope covers (frozen while reviewing)
   const selSig = sel.sig;

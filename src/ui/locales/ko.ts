@@ -233,6 +233,7 @@ const ko: Messages = {
   baseText: '기준',
   baseAreaHint: '마지막으로 선택한 텍스트를 기억하고 있어요. 선택한 영역 안에서 문구가 정확히 같은 텍스트가 이 키로 바뀌어요.',
   manualSync: '수동 동기화',
+  willChange: '{n}개 바뀔 예정',
   error: '오류가 발생했어요: {msg}',
   notifyResync: 'Sheetlingo: {n}개 변경 · {m}개 누락',
   notifyConnectFirst: 'Sheetlingo: 먼저 플러그인을 열어 시트를 연결해 주세요.',

@@ -233,6 +233,7 @@ const de: Messages = {
   baseText: 'Basis',
   baseAreaHint: 'Aus deiner letzten Auswahl gemerkt. Texte mit exakt diesem Wortlaut im ausgewählten Bereich erhalten diesen Schlüssel.',
   manualSync: 'Manueller Sync',
+  willChange: '{n} werden geändert',
   error: 'Etwas ist schiefgelaufen: {msg}',
   notifyResync: 'Sheetlingo: {n} aktualisiert · {m} fehlen',
   notifyConnectFirst: 'Sheetlingo: Öffne das Plugin und verbinde zuerst eine Tabelle.',

@@ -237,6 +237,7 @@ const en = {
   baseText: 'Base',
   baseAreaHint: 'Remembered from your last selection. Texts with exactly this wording inside the selected area will get this key.',
   manualSync: 'Manual sync',
+  willChange: '{n} will change',
   error: 'Something went wrong: {msg}',
   notifyResync: 'Sheetlingo: {n} updated · {m} missing',
   notifyConnectFirst: 'Sheetlingo: open the plugin and connect a sheet first.',

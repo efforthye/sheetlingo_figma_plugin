@@ -448,6 +448,21 @@ export function SyncView(p: {
   const allowed = allowedLanguages(mapping, pro, FREE.maxLanguages);
   const current = p.config.currentLang && allowed.includes(p.config.currentLang) ? p.config.currentLang : mapping.baseLang;
   const dict = useMemo(() => buildDict(p.table, mapping).dict, [p.table, mapping]);
+  // How many layers will actually change (text differs from the value to apply, or a new link)
+  const strip = p.config.stripTags !== false;
+  const willChange = useMemo(() => {
+    let n = 0;
+    for (const it of items) {
+      if (excluded.has(it.id)) continue;
+      const newLink = !it.key || (p.keyOnly && !!p.same && it.key !== p.same.key);
+      if (newLink && !autoLinkOn) continue;
+      const k = newLink ? p.same?.key ?? '' : it.key;
+      const raw = k ? dict[k]?.[current] || dict[k]?.[mapping.baseLang] : undefined;
+      const next = raw !== undefined && strip ? stripTags(raw) : raw;
+      if (newLink || (next !== undefined && normText(next) !== normText(it.text))) n++;
+    }
+    return n;
+  }, [items, p.review?.excluded, autoLinkOn, p.keyOnly, p.same?.key, dict, current, strip]);
   const linkedKey = sel.textCount === 1 && sel.keyedCount === 1 ? sel.keys[0] : '';
   const held = !!(picked && pinned);
   const linking = held || (sel.textCount > 0 && (!linkedKey || changing)) || (!!p.baseFromArea && changing);
@@ -682,7 +697,7 @@ export function SyncView(p: {
           ) : info ? (
             <span className="small">
               <b>{info.names[0] === '*' ? t('docAll') : info.names.slice(0, 2).join(', ')}</b>{info.names.length > 2 ? t('targetMore', { n: info.names.length - 2 }) : ''}
-              {' · '}{t('targetCount', { n: nLinked })}
+              {' · '}<b className="will">{t('willChange', { n: willChange })}</b>{' · '}{t('targetCount', { n: nLinked })}
               {info.unlinked > 0 && <span className="muted">{' · '}{t(autoLinkOn ? 'targetUnlinkedAuto' : 'targetUnlinked', { n: autoLinkOn ? nNew : info.unlinked })}</span>}
               {excluded.size > 0 && <span className="muted">{' · '}{t('reviewExcluded', { n: excluded.size })}</span>}
             </span>
@@ -750,14 +765,14 @@ export function SyncView(p: {
       </div>
       <div className="footer">
         {linking && picked ? (
-          <button className="btn primary block" onClick={linkAndApply}>{info && p.scope !== 'document' ? t('linkApplyScope', { lang: current, n: nLinked + nNew }) : t('linkApply', { lang: current })}</button>
+          <button className="btn primary block" onClick={linkAndApply}>{info && p.scope !== 'document' ? t('linkApplyScope', { lang: current, n: willChange }) : t('linkApply', { lang: current })}</button>
         ) : (
           <button className="btn primary block" disabled={p.busy || (p.scope === 'selection' && !sel.total) ||
-            (!!info && p.scope !== 'document' && nLinked + nNew <= 0)}
+            (!!info && p.scope !== 'document' && willChange <= 0)}
             onClick={() => p.onApply(current)}>
             {p.busy ? <Icon name="refresh" className="spin" size={14} />
               : p.scope !== 'document' && info
-                ? (nNew > 0 ? t('applyCountPlus', { lang: current, n: nLinked, m: nNew }) : t('applyCount', { lang: current, n: nLinked }))
+                ? t('applyCount', { lang: current, n: willChange })
               : t('applyLang', { lang: current })}
           </button>
         )}

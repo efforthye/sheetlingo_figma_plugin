@@ -233,6 +233,7 @@ const fr: Messages = {
   baseText: 'Référence',
   baseAreaHint: 'Mémorisé depuis votre dernière sélection. Les textes au libellé identique dans la zone sélectionnée prendront cette clé.',
   manualSync: 'Synchro manuelle',
+  willChange: '{n} vont changer',
   error: 'Une erreur est survenue : {msg}',
   notifyResync: 'Sheetlingo : {n} mis à jour · {m} manquants',
   notifyConnectFirst: 'Sheetlingo : ouvrez le plugin et connectez d’abord une feuille.',

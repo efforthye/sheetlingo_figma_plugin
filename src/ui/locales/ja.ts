@@ -233,6 +233,7 @@ const ja: Messages = {
   baseText: '基準',
   baseAreaHint: '最後に選択したテキストを記憶しています。選択した範囲内で文言がまったく同じテキストがこのキーに変わります。',
   manualSync: '手動同期',
+  willChange: '{n} 個が変更予定',
   error: 'エラーが発生しました：{msg}',
   notifyResync: 'Sheetlingo：{n} 個更新 · {m} 個不足',
   notifyConnectFirst: 'Sheetlingo：先にプラグインを開いてシートを接続してください。',

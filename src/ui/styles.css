@@ -310,3 +310,4 @@ mark { background: rgba(255, 196, 0, 0.35); color: inherit; border-radius: 2px; 
 .basechip { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 8px; border-radius: 6px; background: var(--bg2); }
 .basetext { font-weight: 600; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .live-dot.ok { background: var(--brand); }
+.target .will { color: var(--brand); }

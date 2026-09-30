@@ -233,6 +233,7 @@ const es: Messages = {
   baseText: 'Base',
   baseAreaHint: 'Recordado de tu última selección. Los textos con exactamente esta redacción dentro del área seleccionada tomarán esta clave.',
   manualSync: 'Sincronización manual',
+  willChange: '{n} cambiarán',
   error: 'Algo salió mal: {msg}',
   notifyResync: 'Sheetlingo: {n} actualizadas · {m} faltantes',
   notifyConnectFirst: 'Sheetlingo: abre el plugin y conecta una hoja primero.',
