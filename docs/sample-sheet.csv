@@ -1,0 +1,7 @@
+key,en,ko,ja,#note
+home.title,Welcome back,다시 오신 걸 환영해요,おかえりなさい,
+home.subtitle,Manage every word of your product in one sheet,모든 문구를 시트 하나로 관리하세요,,ja empty → falls back to en
+home.cta,Get started,시작하기,はじめる,
+nav.settings,Settings,설정,設定,
+price.pro,$5 / month,월 5달러,月額 $5,
+long.text,This sentence is intentionally much longer than the others to test overflow,오버플로 테스트용으로 일부러 아주 길게 만든 문장이에요 정말 길어요,はみ出しテスト用にわざと長くした文です,

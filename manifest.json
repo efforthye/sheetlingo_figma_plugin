@@ -1,0 +1,38 @@
+{
+  "name": "Sheetlingo",
+  "id": "1686971732936550159",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/ui.html",
+  "editorType": [
+    "figma"
+  ],
+  "documentAccess": "dynamic-page",
+  "permissions": [
+    "payments"
+  ],
+  "networkAccess": {
+    "allowedDomains": [
+      "https://docs.google.com",
+      "https://*.googleusercontent.com",
+      "https://sheets.googleapis.com",
+      "https://www.googleapis.com",
+      "https://cdn.jsdelivr.net"
+    ],
+    "reasoning": "Reads the Google Sheet the user connects (public CSV or Google Sheets API after sign-in) and loads the Pretendard UI font."
+  },
+  "relaunchButtons": [
+    {
+      "command": "open",
+      "name": "Open Sheetlingo"
+    },
+    {
+      "command": "resync",
+      "name": "Re-sync from sheet"
+    },
+    {
+      "command": "key",
+      "name": "Sheetlingo key"
+    }
+  ]
+}

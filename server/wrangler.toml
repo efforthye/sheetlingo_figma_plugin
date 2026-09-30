@@ -1,0 +1,17 @@
+name = "sheetlingo-auth"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Create with: npx wrangler kv namespace create PENDING  → paste the id below
+[[kv_namespaces]]
+binding = "PENDING"
+id = "REPLACE_WITH_KV_ID"
+
+[vars]
+GOOGLE_CLIENT_ID = "REPLACE_WITH_CLIENT_ID.apps.googleusercontent.com"
+GOOGLE_API_KEY = "REPLACE_WITH_BROWSER_API_KEY"
+GOOGLE_APP_ID = "REPLACE_WITH_PROJECT_NUMBER"
+
+# Secrets (not in this file):
+#   npx wrangler secret put GOOGLE_CLIENT_SECRET
+#   npx wrangler secret put TOKEN_SECRET        (any long random string)
