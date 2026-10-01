@@ -8,7 +8,7 @@ import { CopyButton, Icon, ReportView, Seg, copyText } from './components';
 import { LOCALES, type Locale, type MsgKey, type T } from './i18n';
 import type { Scope as ScopeT } from '../shared/types';
 import { APPS_SCRIPT, SAMPLE_CSV, SheetError, detectHeaderRow, fetchGoogleSheet, fetchScriptTabs, isScriptUrl, parseCsv, parseSheetUrl, scriptUrlWithGid, toTable } from './sheet';
-import { GoogleError, fetchTab, freshAuth, listTabs, revoke, signInAndPick, type Tab } from './google';
+import { GoogleError, fetchDriveCsv, fetchTab, freshAuth, listTabs, revoke, signInAndPick, type Tab } from './google';
 
 export function errorText(e: unknown, t: T): string {
   if (e instanceof SheetError) {
@@ -40,6 +40,8 @@ const GoogleG = () => (
 /* ───────────────────────── Source & settings ───────────────────────── */
 
 export function SourceView(p: {
+  /** 'sheet' = the Sheet tab (connect / columns), 'settings' = options only. */
+  part: 'sheet' | 'settings';
   t: T; config: DocConfig; table: Table | null; pro: boolean; locale: Locale;
   onSave: (meta: SourceMeta, table: Table, mapping: Mapping) => void;
   saveConfig: (c: DocConfig) => void; setLocale: (l: Locale) => void;
@@ -96,9 +98,17 @@ export function SourceView(p: {
       label: `${file.name} · ${tab.title}`, fetchedAt: Date.now(), rowCount: table.rows.length,
     });
   };
-  const loadFile = async (a0: GoogleAuth, fileId: string, gid?: number) => {
+  const loadFile = async (a0: GoogleAuth, fileId: string, gid?: number, picked?: { name: string; mime?: string }) => {
     setStatus('loading');
     const a = await withAuth(a0);
+    // A .csv file in Drive (not a Google Sheet): download it as text. Tabs don't apply.
+    if (picked?.mime && picked.mime !== 'application/vnd.google-apps.spreadsheet') {
+      const raw = await fetchDriveCsv(a.accessToken, fileId);
+      const table = toTable(raw, detectHeaderRow(raw));
+      setTabs(null); setApiFile({ id: fileId, name: picked.name });
+      accept(table, { kind: 'google-api', fileId, sheetId: -1, sheetTitle: '', label: picked.name, fetchedAt: Date.now(), rowCount: table.rows.length });
+      return;
+    }
     const info = await listTabs(a.accessToken, fileId);
     const file = { id: fileId, name: info.title || 'Google Sheet' };
     setTabs(info.tabs); setApiFile(file);
@@ -121,7 +131,7 @@ export function SourceView(p: {
       const merged: GoogleAuth = { ...auth, refresh: auth.refresh ?? p.auth?.refresh ?? null };
       p.onAuth(merged);
       setSigning(false);
-      await loadFile(merged, file.id, file.id === hint ? gid : undefined);
+      await loadFile(merged, file.id, file.id === hint ? gid : undefined, file);
     } catch (e) { setSigning(false); authFail(e); }
   };
   const changeTab = async (id: number) => {
@@ -213,12 +223,28 @@ export function SourceView(p: {
     setMapping({ ...mapping, keyColumn, languages, baseLang });
   };
 
-  const trySample = () => accept(parseCsv(SAMPLE_CSV), { kind: 'paste', label: 'Sample data', fetchedAt: Date.now(), rowCount: 7 });
+  const trySample = () => { const tb = parseCsv(SAMPLE_CSV); accept(tb, { kind: 'paste', label: 'Sample data', fetchedAt: Date.now(), rowCount: tb.rows.length }); };
   const downloadSample = () => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['\uFEFF' + SAMPLE_CSV], { type: 'text/csv;charset=utf-8' }));
-    a.download = 'sheetlingo-example.csv'; a.click();
+    a.download = 'sheetlingo-example.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
+
+  /** Format hint + 3-row preview of the example, with "fill" and "download" shortcuts. */
+  const sampleRows = SAMPLE_CSV.split('\n').slice(0, 4).map((l) => l.split(',').slice(0, 3));
+  const formatHelp = (onFill: () => void) => (
+    <div className="csv-help">
+      <span className="small muted">{t('csvFormat')}</span>
+      <table className="csv-preview"><tbody>
+        {sampleRows.map((r, i) => <tr key={i} className={i ? '' : 'head'}>{r.map((c, j) => <td key={j}>{c}</td>)}<td className="more">…</td></tr>)}
+      </tbody></table>
+      <div className="row">
+        <button className="btn ghost sm" onClick={onFill}>{t('fillSample')}</button>
+        <button className="btn ghost sm" onClick={downloadSample}><Icon name="download" size={12} />{t('downloadSample')}</button>
+      </div>
+    </div>
+  );
+  const detected = draft && mapping ? t('sampleDetected', { keys: draft.table.rows.length, langs: mapping.languages.length }) : '';
 
   const cols = draft?.table.columns ?? [];
   const raw = draft?.table.raw ?? (draft ? [draft.table.columns, ...draft.table.rows] : []);
@@ -227,6 +253,38 @@ export function SourceView(p: {
     return draft?.table.rows.find((r) => r[i]?.trim())?.[i] ?? '';
   };
   const canSave = !!(draft && mapping && mapping.keyColumn && mapping.languages.length && mapping.baseLang);
+
+  if (p.part === 'settings') return (
+    <div className="body">
+      <div className="card stack">
+        <h2>{t('options')}</h2>
+        <label className="check">
+          <input type="checkbox" checked={config.renameOnBind} onChange={(e) => p.saveConfig({ ...config, renameOnBind: e.target.checked })} />
+          <span>{t('optRename')}</span>
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={config.autoSync} disabled={config.source?.kind !== 'google' && config.source?.kind !== 'google-api'}
+            onChange={(e) => p.saveConfig({ ...config, autoSync: e.target.checked })} />
+          <span>{t('optAuto')}</span>
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={config.unlinkOnEdit !== false} onChange={(e) => p.saveConfig({ ...config, unlinkOnEdit: e.target.checked })} />
+          <span>{t('optUnlinkOnEdit')}</span>
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={config.stripTags !== false} onChange={(e) => p.saveConfig({ ...config, stripTags: e.target.checked })} />
+          <span>{t('optStripTags')}</span>
+        </label>
+        <div className="field">
+          <label>{t('uiLanguage')}</label>
+          <select className="select" value={p.locale} onChange={(e) => p.setLocale(e.target.value as Locale)}>
+            {(Object.keys(LOCALES) as Locale[]).map((l) => <option key={l} value={l}>{LOCALES[l].name}</option>)}
+          </select>
+        </div>
+        <span className="small muted">Sheetlingo v{__VERSION__} · build {__BUILD__}</span>
+      </div>
+    </div>
+  );
 
   return (
     <>
@@ -341,7 +399,8 @@ export function SourceView(p: {
             </div>
             <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) readFile(f); e.target.value = ''; }} />
             {status === 'error' && <div className="note err">{err}</div>}
-            {status === 'ok' && draft?.meta.kind === 'file' && <div className="note ok">{draft.meta.label} · {t('accessOk', { rows: draft.table.rows.length, cols: draft.table.columns.length })}</div>}
+            {status === 'ok' && draft?.meta.kind === 'file' && <div className="note ok row"><Icon name="check" size={14} />{draft.meta.label} · {detected}</div>}
+            {formatHelp(trySample)}
           </div>
         )}
 
@@ -350,6 +409,8 @@ export function SourceView(p: {
             <textarea className="input" placeholder={t('pastePlaceholder')} value={paste} onChange={(e) => setPaste(e.target.value)} />
             <button className="btn" disabled={!paste.trim()} onClick={usePaste}>{t('usePaste')}</button>
             {status === 'error' && <div className="note err">{err}</div>}
+            {status === 'ok' && draft?.meta.kind === 'paste' && <div className="note ok row"><Icon name="check" size={14} />{detected}</div>}
+            {formatHelp(() => setPaste(SAMPLE_CSV))}
           </div>
         )}
 
@@ -416,34 +477,7 @@ export function SourceView(p: {
         )}
 
         {config.source && (
-          <div className="card stack">
-            <h2>{t('options')}</h2>
-            <label className="check">
-              <input type="checkbox" checked={config.renameOnBind} onChange={(e) => p.saveConfig({ ...config, renameOnBind: e.target.checked })} />
-              <span>{t('optRename')}</span>
-            </label>
-            <label className="check">
-              <input type="checkbox" checked={config.autoSync} disabled={config.source.kind !== 'google' && config.source.kind !== 'google-api'}
-                onChange={(e) => p.saveConfig({ ...config, autoSync: e.target.checked })} />
-              <span>{t('optAuto')}</span>
-            </label>
-            <label className="check">
-              <input type="checkbox" checked={config.unlinkOnEdit !== false} onChange={(e) => p.saveConfig({ ...config, unlinkOnEdit: e.target.checked })} />
-              <span>{t('optUnlinkOnEdit')}</span>
-            </label>
-            <label className="check">
-              <input type="checkbox" checked={config.stripTags !== false} onChange={(e) => p.saveConfig({ ...config, stripTags: e.target.checked })} />
-              <span>{t('optStripTags')}</span>
-            </label>
-            <div className="field">
-              <label>{t('uiLanguage')}</label>
-              <select className="select" value={p.locale} onChange={(e) => p.setLocale(e.target.value as Locale)}>
-                {(Object.keys(LOCALES) as Locale[]).map((l) => <option key={l} value={l}>{LOCALES[l].name}</option>)}
-              </select>
-            </div>
-            <button className="btn ghost danger sm" style={{ alignSelf: 'flex-start' }} onClick={p.onDisconnect}>{t('disconnect')}</button>
-            <span className="small muted">Sheetlingo v{__VERSION__} · build {__BUILD__}</span>
-          </div>
+          <button className="btn ghost danger sm" style={{ alignSelf: 'flex-start' }} onClick={p.onDisconnect}>{t('disconnect')}</button>
         )}
       </div>
       <div className="footer">
@@ -462,7 +496,7 @@ export function SyncView(p: {
   pro: boolean; busy: boolean; report: Rep; onApply: (lang: string) => void; onUpgrade: (reason?: MsgKey) => void; usage: number;
   onSelectLang: (lang: string) => void; scopeInfo: ScopeInfo | null; saveConfig: (c: DocConfig) => void;
   same: SameRef | null; review: Review | null; setReview: (r: Review | null) => void;
-  unlinkedPos: { index: number; total: number } | null;
+  unlinkedPos: { index: number; total: number; here?: boolean } | null;
   onPendingSame: (r: SameRef | null) => void;
   inspectKey: string | null; onCloseInspect: () => void;
   keyOnly: boolean; setKeyOnly: (v: boolean) => void;
@@ -471,7 +505,7 @@ export function SyncView(p: {
   baseFromArea: SameRef | null;
 }) {
   const { t, mapping, pro, sel } = p;
-  const autoLinkOn = p.config.autoLinkOnApply !== false && (p.scope === 'selection' || p.keyOnly);
+  const autoLinkOn = p.scope === 'selection' || p.keyOnly; // identical unlinked texts always get the key
   const info = p.scopeInfo && p.scopeInfo.scope === p.scope ? p.scopeInfo : null;
   const excluded = new Set(p.review?.excluded ?? []);
   const items = info?.items ?? [];
@@ -484,7 +518,7 @@ export function SyncView(p: {
   const rv = p.review ?? { excluded: [], index: -1 };
   const go = (i: number) => {
     if (!items.length) return;
-    const idx = (i + items.length) % items.length;
+    const idx = Math.max(0, Math.min(items.length - 1, i));
     p.setReview({ ...rv, index: idx });
     send({ type: 'focus', nodeId: items[idx].id });
   };
@@ -497,6 +531,32 @@ export function SyncView(p: {
   const dict = useMemo(() => buildDict(p.table, mapping).dict, [p.table, mapping]);
   // How many layers will actually change (text differs from the value to apply, or a new link)
   const strip = p.config.stripTags !== false;
+  // "✓ Applied" for a moment right after an apply, then the button shows what is left to change.
+  const [justApplied, setJustApplied] = useState(false);
+  /** "Here is what will happen" step before applying. */
+  const [confirm, setConfirm] = useState<{ link: number; change: number; key: string; run: () => void } | null>(null);
+  /** All pages: count first (main thread loads every page), then show the confirm step with real numbers. */
+  const [counting, setCounting] = useState<null | ((info: ScopeInfo) => void)>(null);
+  useEffect(() => {
+    if (!counting || !p.scopeInfo || p.scopeInfo.scope !== 'document') return;
+    const cb = counting; setCounting(null); cb(p.scopeInfo);
+  }, [p.scopeInfo, counting]);
+  const countAll = (then: (info: ScopeInfo) => void) => {
+    setCounting(() => then);
+    send({ type: 'scope-info', scope: 'document', same: p.keyOnly && p.same ? p.same : undefined, lang: current });
+  };
+  const changesIn = (inf: ScopeInfo) => inf.willChange ?? inf.items.filter((it) => {
+    const k = it.key || p.same?.key || '';
+    const raw = k ? dict[k]?.[current] || dict[k]?.[mapping.baseLang] : undefined;
+    const v = raw !== undefined && strip ? stripTags(raw) : raw;
+    return !it.key || (v !== undefined && normText(v) !== normText(it.text));
+  }).length;
+  useEffect(() => {
+    if (p.report?.source !== 'sync' || !p.report.report.updated) return;
+    setJustApplied(true);
+    const id = setTimeout(() => setJustApplied(false), 1600);
+    return () => clearTimeout(id);
+  }, [p.report]);
   const willChange = useMemo(() => {
     let n = 0;
     for (const it of items) {
@@ -510,8 +570,15 @@ export function SyncView(p: {
     }
     return n;
   }, [items, p.review?.excluded, autoLinkOn, p.keyOnly, p.same?.key, dict, current, strip]);
-  const linkedKey = sel.textCount === 1 && sel.keyedCount === 1 ? sel.keys[0] : '';
+  // Pinned texts outside the chosen area still get linked (and changed), so they count too.
+  const pinnedExtra = pinned ? pinned.ids.filter((id) => !items.some((i) => i.id === id)).length : 0;
+  const linkChange = willChange + pinnedExtra;
+  // A key that isn't in the sheet (old extract, layer named #…) isn't a real link: treat the text as unlinked.
+  const rawKey = sel.textCount === 1 && sel.keyedCount === 1 ? sel.keys[0] : '';
+  const linkedKey = rawKey && dict[rawKey] ? rawKey : '';
   const held = !!(picked && pinned);
+  // The key card's language rows act as the switch, so the separate chips are hidden while it shows.
+  const keyCardShown = (!held && (!!linkedKey || !!p.baseFromArea) && !changing) || !!picked;
   const linking = held || (sel.textCount > 0 && (!linkedKey || changing)) || (!!p.baseFromArea && changing);
   const selKey = sel.keys.join('|') + '#' + sel.firstText;
   // A picked key stays pinned to its text while you select a frame/area for "Apply to"
@@ -527,21 +594,39 @@ export function SyncView(p: {
   const step3 = useRef<HTMLDivElement>(null);
   useEffect(() => { if (picked) step3.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [picked]);
 
-  const linkAndApply = () => {
+  const linkAndApply = (langArg?: string) => {
     if (!picked) return;
+    const lang = langArg || current;
     const v = dict[picked];
-    const val = v?.[current] || v?.[mapping.baseLang];
+    const val = v?.[lang] || v?.[mapping.baseLang];
     const strip = p.config.stripTags !== false;
     // One step: link the pinned text(s) to the key, then apply the language to the chosen scope
     send({
       type: 'bind', key: picked, value: val !== undefined && strip ? stripTags(val) : val, ids: pinned?.ids,
-      sync: { table: p.table, mapping, lang: current, scope: p.scope, stripTags: strip,
+      sync: { table: p.table, mapping, lang, scope: p.scope, stripTags: strip,
         same: p.keyOnly || !p.same ? { key: picked, text: pinned?.text ?? sel.firstText, relink: true } : undefined },
     });
-    p.onSelectLang(current);
+    p.onSelectLang(lang);
     unpin();
   };
-  const Values = ({ k }: { k: string }) => (
+  /** "Apply language" chips: shown at the top of step 3. */
+  const LangChips = () => (
+    <div className="field">
+      <label>{t('language')}</label>
+      <div className="chips">
+        {mapping.languages.map((l) => {
+          const locked = !allowed.includes(l);
+          return (
+            <button key={l} className={'chip' + (l === current ? ' on' : '') + (locked ? ' locked' : '')}
+              onClick={() => (locked ? p.onUpgrade('upLang') : p.onSelectLang(l))} disabled={p.busy}>
+              {l}{l === mapping.baseLang && <span className="base">BASE</span>}{locked && <Icon name="lock" size={11} />}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+  const Values = ({ k }: { k: string; onPick?: (l: string) => void }) => (
     <div className="vals">
       {mapping.languages.map((l) => (
         <div key={l} className={'val' + (l === current ? ' on' : '')}><b>{l}</b><span className={dict[k]?.[l] ? '' : 'muted'}>{dict[k]?.[l] || t('emptyVal')}</span></div>
@@ -562,7 +647,7 @@ export function SyncView(p: {
               {held ? (
                 <div className="stack">
                   <div className="seltext pinned">
-                    “{pinned!.text.length > 120 ? pinned!.text.slice(0, 120) + '…' : pinned!.text || ' '}”
+                    “{pinned!.text || ' '}”
                     {pinned!.ids.length > 1 && <span className="small muted"> +{pinned!.ids.length - 1}</span>}
                   </div>
                   <div className="row between">
@@ -572,18 +657,19 @@ export function SyncView(p: {
                 </div>
               ) : p.baseFromArea ? (
                 <div className="stack">
-                  <div className="seltext pinned">“{p.baseFromArea.text.length > 120 ? p.baseFromArea.text.slice(0, 120) + '…' : p.baseFromArea.text}”</div>
+                  <div className="seltext pinned">“{p.baseFromArea.text}”</div>
                   <span className="small muted">{t('baseAreaHint')}</span>
                 </div>
               ) : sel.textCount === 0 && sel.containerCount > 0 ? (
                 <div className="stack">
-                  <span className="small muted">{t('frameSelected', { n: sel.insideCount })}</span>
+                  <span className="small muted"><Em text={t('frameSelected', { n: sel.insideCount })} n={sel.insideCount} /></span>
+                  {(sel.insideUnlinked ?? 0) > 0 && <span className="small muted"><Em text={t('frameUnlinked', { n: sel.insideUnlinked ?? 0 })} n={sel.insideUnlinked ?? 0} /></span>}
                   {sel.inside.length > 0 && (
                     <div className="klist scroll mini">
                       {sel.inside.map((x) => (
                         <div key={x.nodeId} className="krow" onClick={() => send({ type: 'focus', nodeId: x.nodeId })} title={t('frameItemHint')}>
-                          <div className="k"><span className="kname">{x.key}</span></div>
-                          <div className="v">{x.text || t('emptyVal')}</div>
+                          <div className="ftext">{x.text || t('emptyVal')}</div>
+                          <div className="fkey">{x.key ? <span className="kname">{x.key}</span> : <span className="tag">{t('notLinkedTag')}</span>}</div>
                         </div>
                       ))}
                     </div>
@@ -593,21 +679,14 @@ export function SyncView(p: {
                 <span className="small muted">{t('start1')}</span>
               ) : (
                 <div className="seltext">
-                  “{sel.firstText.length > 120 ? sel.firstText.slice(0, 120) + '…' : sel.firstText || ' '}”
+                  “{sel.firstText || ' '}”
                   {sel.textCount > 1 && <span className="small muted"> +{sel.textCount - 1}</span>}
-                </div>
-              )}
-              {sel.textCount > 0 && (
-                <div className="row unlinked-nav">
-                  <button className="btn ghost sm" onClick={() => send({ type: 'select-next-unlinked', dir: -1 })}>‹ {t('prev')}</button>
-                  <span className="small muted grow">{t('unlinkedNav')}{p.unlinkedPos ? ` ${p.unlinkedPos.index + 1} / ${p.unlinkedPos.total}` : ''}</span>
-                  <button className="btn ghost sm" onClick={() => send({ type: 'select-next-unlinked', dir: 1 })}>{t('next')} ›</button>
                 </div>
               )}
             </div>
           </div>
 
-          {!held && !p.baseFromArea && sel.textCount === 0 && sel.containerCount > 0 ? null : !held && (linkedKey || p.baseFromArea) && !changing ? (
+          {!held && (linkedKey || p.baseFromArea) && !changing ? (
             <div className="step done">
               <span className="num">2</span>
               <div className="grow stack">
@@ -619,7 +698,6 @@ export function SyncView(p: {
                   </div>
                 </div>
                 <div className="row keyline"><code className="keyname grow">{linkedKey || p.baseFromArea!.key}</code><CopyButton text={linkedKey || p.baseFromArea!.key} title={t('copy')} /></div>
-                <Values k={linkedKey || p.baseFromArea!.key} />
               </div>
             </div>
           ) : (
@@ -654,6 +732,27 @@ export function SyncView(p: {
             </div>
           )}
 
+          {!held && (linkedKey || p.baseFromArea) && !changing && (
+            <div className="step active">
+              <span className="num">3</span>
+              <div className="grow stack">
+                <b>{t('stepLang')}</b>
+                <LangChips />
+                <Values k={linkedKey || p.baseFromArea!.key} />
+              </div>
+            </div>
+          )}
+
+          {!linking && !(!held && (linkedKey || p.baseFromArea) && !changing) && (
+            <div className="step active">
+              <span className="num">3</span>
+              <div className="grow stack">
+                <b>{t('stepLang')}</b>
+                <LangChips />
+              </div>
+            </div>
+          )}
+
           {linking && (
             <div ref={step3} className={'step' + (picked ? ' active' : '')}>
               <span className="num">3</span>
@@ -661,6 +760,7 @@ export function SyncView(p: {
                 <b>{t('stepApply')}</b>
                 {picked ? (
                   <>
+                    <LangChips />
                     {!held && <div className="row keyline"><code className="keyname grow">{picked}</code><CopyButton text={picked} title={t('copy')} /></div>}
                     <Values k={picked} />
                   </>
@@ -681,20 +781,6 @@ export function SyncView(p: {
           </div>
         )}
         <div className="field">
-          <label>{t('language')}</label>
-          <div className="chips">
-            {mapping.languages.map((l) => {
-              const locked = !allowed.includes(l);
-              return (
-                <button key={l} className={'chip' + (l === current ? ' on' : '') + (locked ? ' locked' : '')}
-                  onClick={() => (locked ? p.onUpgrade('upLang') : p.onSelectLang(l))} disabled={p.busy}>
-                  {l}{l === mapping.baseLang && <span className="base">BASE</span>}{locked && <Icon name="lock" size={11} />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="field">
           <label>{t('scope')}</label>
           <Seg value={p.scope} onChange={(s) => { p.setReview(null); p.setScope(s); }} options={[
             { value: 'selection', label: t('scopeSelection') },
@@ -703,28 +789,17 @@ export function SyncView(p: {
           ]} />
           {p.same && p.keyOnly ? (
             <div className="field" style={{ marginTop: 6 }}>
-              {!held && (
-                <div className="basechip">
-                  <span className="small muted">{t('baseText')}</span>
-                  <span className="grow basetext">“{p.same.text.length > 40 ? p.same.text.slice(0, 40) + '…' : p.same.text}”</span>
-                  <button className="icon-btn sm" title={t('cancel')} onClick={p.onClearBase}><Icon name="x" size={12} /></button>
-                </div>
-              )}
-              <span className="small muted">{t('whatKeyHint', { area: t(p.scope === 'selection' ? 'scopeSelection' : p.scope === 'page' ? 'scopePage' : 'scopeDocument') })}</span>
+              {(() => {
+                const area = t(p.scope === 'selection' ? 'scopeSelection' : p.scope === 'page' ? 'scopePage' : 'scopeDocument');
+                const n = nLinked + nNew;
+                return <span className="small muted">{info && p.scope !== 'document'
+                  ? <Em text={t('whatKeyHintN', { area, n })} n={n} /> : t('whatKeyHint', { area })}</span>;
+              })()}
             </div>
           ) : (
             <span className="small muted">{t(p.scope === 'selection' ? 'scopeHintSel' : p.scope === 'page' ? 'scopeHintPage' : 'scopeHintDoc')}</span>
           )}
         </div>
-        {(p.keyOnly || p.scope === 'selection') && info && info.unlinked > 0 && (
-          <label className="check small">
-            <input type="checkbox" checked={p.config.autoLinkOnApply !== false} onChange={(e) => p.saveConfig({ ...p.config, autoLinkOnApply: e.target.checked })} />
-            <span className="stack" style={{ gap: 1 }}>
-              <span>{t('optAutoLinkApply', { n: info.unlinked })}</span>
-              <span className="muted">{t('optAutoLinkApplyHint')}</span>
-            </span>
-          </label>
-        )}
         <div className={'target' + (p.scope === 'selection' && !sel.total ? ' empty' : '')}>
           <div className="row between">
             <span className="small muted">{t('targetLabel')}</span>
@@ -742,19 +817,19 @@ export function SyncView(p: {
           ) : p.scope === 'document' ? (
             <span className="small"><b>{t('docAll')}</b></span>
           ) : info ? (
-            <span className="small">
-              <b>{info.names[0] === '*' ? t('docAll') : info.names.slice(0, 2).join(', ')}</b>{info.names.length > 2 ? t('targetMore', { n: info.names.length - 2 }) : ''}
-              {' · '}<b className="will">{t('willChange', { n: willChange })}</b>{' · '}{t('targetCount', { n: nLinked })}
-              {info.unlinked > 0 && <span className="muted">{' · '}{t(autoLinkOn ? 'targetUnlinkedAuto' : 'targetUnlinked', { n: autoLinkOn ? nNew : info.unlinked })}</span>}
-              {excluded.size > 0 && <span className="muted">{' · '}{t('reviewExcluded', { n: excluded.size })}</span>}
-            </span>
+            <div className="small target-lines">
+              <div><b>{info.names[0] === '*' ? t('docAll') : info.names.slice(0, 2).join(', ')}</b>{info.names.length > 2 ? t('targetMore', { n: info.names.length - 2 }) : ''}</div>
+              <div><Em text={t('targetCount', { n: nLinked })} n={nLinked} /></div>
+              {info.unlinked > 0 && <div className="muted"><Em text={t(autoLinkOn ? 'targetUnlinkedAuto' : 'targetUnlinked', { n: autoLinkOn ? nNew : info.unlinked })} n={autoLinkOn ? nNew : info.unlinked} /></div>}
+              {excluded.size > 0 && <div className="muted">{t('reviewExcluded', { n: excluded.size })}</div>}
+            </div>
           ) : (
             <span className="small muted">…</span>
           )}
           {listOpen && info && items.length > 0 && (
             <div className="review in-target">
-              <div className="row between review-nav">
-                <button className="btn sm" onClick={() => go(rv.index - 1)}>‹ {t('prev')}</button>
+              {items.length > 1 && <div className="row between review-nav">
+                <button className="btn sm" disabled={rv.index <= 0} onClick={() => go(rv.index - 1)}>‹ {t('prev')}</button>
                 <div className="nav-cur grow">
                   {rv.index >= 0 && items[rv.index] ? (
                     <>
@@ -768,17 +843,22 @@ export function SyncView(p: {
                     <span className="small muted">{t('reviewHint')}</span>
                   )}
                 </div>
-                <button className="btn sm" onClick={() => go(rv.index + 1)}>{t('next')} ›</button>
-              </div>
+                <button className="btn sm" disabled={rv.index >= items.length - 1} onClick={() => go(rv.index + 1)}>{t('next')} ›</button>
+              </div>}
               <div className="klist scroll">
                 {items.map((it, i) => {
-                  const off = excluded.has(it.id);
                   const willLink = !it.key || (p.keyOnly && !!p.same && it.key !== p.same.key);
                   if (willLink && !autoLinkOn) return null;
+                  const kk = it.key || (p.keyOnly ? p.same?.key : '');
+                  const rawV = kk ? dict[kk]?.[current] || dict[kk]?.[mapping.baseLang] : undefined;
+                  const nv = rawV !== undefined && strip ? stripTags(rawV) : rawV;
+                  // Already shows the target wording: nothing to do, so it stays unchecked.
+                  const same = !willLink && nv !== undefined && normText(nv) === normText(it.text);
+                  const off = same || excluded.has(it.id);
                   return (
                     <div key={it.id} className={'krow trow' + (i === rv.index ? ' picked' : '') + (off ? ' off' : '')} onClick={() => go(i)}>
                       <div className="k">
-                        <input type="checkbox" checked={!off} onClick={(e) => e.stopPropagation()}
+                        <input type="checkbox" checked={!off} disabled={same} onClick={(e) => e.stopPropagation()}
                           onChange={() => {
                             const ex = new Set(excluded);
                             if (off) ex.delete(it.id); else ex.add(it.id);
@@ -786,6 +866,7 @@ export function SyncView(p: {
                           }} />
                         <span className="kname grow">{it.text || t('emptyVal')}</span>
                         {willLink && <span className="tag new">{t('reviewNew')}</span>}
+                        {same && <span className="tag">{t('reviewSame')}</span>}
                       </div>
                       {(() => {
                         const k = it.key || (p.keyOnly ? p.same?.key : '');
@@ -805,27 +886,57 @@ export function SyncView(p: {
         </div>
 
 
-        {p.report?.source === 'sync' && <ReportView t={t} pro={pro} onUpgrade={p.onUpgrade} {...p.report} />}
-        {p.report?.source === 'bind' && (p.report.report.failed.length > 0 || p.report.report.ambiguous.length > 0 || p.report.report.total > 1) && (
-          <ReportView t={t} pro={pro} onUpgrade={p.onUpgrade} {...p.report} />
-        )}
       </div>
       <div className="footer">
+        {counting && (
+          <div className="overlay center">
+            <div className="sheet confirm-sheet">
+              <div className="row"><Icon name="refresh" className="spin" size={14} /><b>{t('countingAll')}</b></div>
+              <span className="small muted">{t('countingAllHint')}</span>
+            </div>
+          </div>
+        )}
+        {confirm && (
+          <div className="overlay center" onClick={() => setConfirm(null)}>
+            <div className="sheet confirm-sheet" onClick={(e) => e.stopPropagation()}>
+              <b>{t('confirmTitle')}</b>
+              <ul className="confirm-list">
+                {confirm.link > 0 && <li>{t('confirmLink', { n: confirm.link, key: confirm.key })}</li>}
+                <li>{confirm.change >= 0 ? t('confirmApply', { n: confirm.change, lang: current }) : t('confirmApplyAll', { lang: current })}</li>
+              </ul>
+              <div className="row result-actions">
+                <span className="sp" />
+                <button className="btn ghost sm" onClick={() => setConfirm(null)}>{t('cancel')}</button>
+                <button className="btn primary sm" onClick={() => { const c = confirm; setConfirm(null); c.run(); }}>{t('confirmOk')}</button>
+              </div>
+            </div>
+          </div>
+        )}
         {linking && picked ? (
-          <button className="btn primary block" onClick={linkAndApply}>{info && p.scope !== 'document' ? t('linkApplyScope', { lang: current, n: willChange }) : t('linkApply', { lang: current })}</button>
+          <button className="btn primary block" onClick={() => p.scope === 'document' ? countAll((inf) => setConfirm({ link: (pinned?.ids.length ?? sel.textCount) + inf.unlinked, change: changesIn(inf) + pinnedExtra, key: picked, run: () => linkAndApply() })) : setConfirm({ link: new Set([...(pinned?.ids ?? []), ...items.filter((i) => !excluded.has(i.id) && (!i.key || i.key !== picked)).map((i) => i.id)]).size + (pinned ? 0 : (items.some((i) => i.id === sel.sig) ? 0 : sel.textCount)), change: info ? linkChange : -1, key: picked, run: () => linkAndApply() })}>{info && p.scope !== 'document' ? t('linkApplyScope', { lang: current, n: linkChange }) : t('linkApply', { lang: current })}</button>
         ) : (
-          <button className="btn primary block" disabled={p.busy || (p.scope === 'selection' && !sel.total) ||
-            (!!info && p.scope !== 'document' && willChange <= 0)}
-            onClick={() => p.onApply(current)}>
+          <button className="btn primary block" disabled={p.busy || justApplied || (p.scope === 'selection' && !sel.total) ||
+            (!!info && p.scope !== 'document' && willChange <= 0) || !!counting}
+            onClick={() => p.scope === 'document'
+              ? countAll((inf) => setConfirm({ link: 0, change: changesIn(inf), key: p.same?.key ?? '', run: () => p.onApply(current) }))
+              : setConfirm({ link: autoLinkOn ? nNew : 0, change: info ? willChange : -1, key: p.same?.key ?? '', run: () => p.onApply(current) })}>
             {p.busy ? <Icon name="refresh" className="spin" size={14} />
+              : justApplied ? <><Icon name="check" size={14} />{t('applied')}</>
               : p.scope !== 'document' && info
-                ? t('applyCount', { lang: current, n: willChange })
+                ? (willChange > 0 ? t('applyCount', { lang: current, n: willChange }) : t('nothingToChange'))
               : t('applyLang', { lang: current })}
           </button>
         )}
       </div>
     </>
   );
+}
+
+/** Renders a translated sentence with its count in the accent color. */
+function Em({ text, n }: { text: string; n: number }) {
+  const k = String(n), i = text.indexOf(k);
+  if (i < 0) return <>{text}</>;
+  return <>{text.slice(0, i)}<b className="num-em">{k}</b>{text.slice(i + k.length)}</>;
 }
 
 /* ───────────────────────── Fill ───────────────────────── */
@@ -897,7 +1008,6 @@ export function FillView(p: { t: T; table: Table; mapping: Mapping; sel: Selecti
             })}
           </div>
         )}
-        {p.report?.source === 'fill' && <ReportView t={t} pro={pro} onUpgrade={p.onUpgrade} {...p.report} />}
       </div>
       <div className="footer">
         <button className="btn primary block" disabled={p.busy || n === 0} onClick={fill}>
@@ -969,6 +1079,10 @@ export function KeyPicker(p: {
   scroll?: boolean;
   /** Show a "where is it used" button per key. */
   onUsage?: (key: string) => void;
+  /** Rows act as links (no radio mark). */
+  plain?: boolean;
+  /** Uses per key on this page: list only used keys (most used first) unless searching. */
+  counts?: Record<string, number>;
 }) {
   const { t, sel, mapping, pro } = p;
   const [q, setQ] = useState('');
@@ -980,7 +1094,18 @@ export function KeyPicker(p: {
   // Nothing typed + a text layer selected → suggest keys matching its current text
   const suggest = !q.trim() && sel.textCount > 0 && !!sel.firstText.trim();
   const query = suggest ? sel.firstText : q;
-  const hits = useMemo(() => searchKeys(entries, query, mapping.languages), [entries, query, mapping.languages]);
+  // Suggestions for the selected text: only keys whose value is exactly that wording (any language)
+  const hits = useMemo(() => {
+    const all = searchKeys(entries, query, mapping.languages);
+    if (!suggest) {
+      const c = p.counts;
+      if (!c) return all;
+      const used = q.trim() ? all : all.filter((h) => (c[h.key] ?? 0) > 0);
+      return q.trim() ? used : [...used].sort((a, b) => (c[b.key] ?? 0) - (c[a.key] ?? 0));
+    }
+    const want = normText(sel.firstText);
+    return all.filter((h) => mapping.languages.some((l) => { const v = h.v[l]; return !!v && (normText(v) === want || normText(stripTags(v)) === want); }));
+  }, [entries, query, mapping.languages, suggest, sel.firstText, p.counts, q]);
   const [more, setMore] = useState(0);
   useEffect(() => setMore(0), [query]);
   const pageSize = 200;
@@ -998,9 +1123,11 @@ export function KeyPicker(p: {
   return (
     <div className="stack">
       <input className="input" placeholder={t('searchKeys')} value={q} onChange={(e) => setQ(e.target.value)} />
-      {suggest && <span className="small muted">{t('suggestFor', { text: sel.firstText.length > 40 ? sel.firstText.slice(0, 40) + '…' : sel.firstText })}</span>}
+      {suggest && <span className="small muted">{t('suggestFor', { text: sel.firstText })}</span>}
       {query.trim() && hits.length === 0 ? (
         <div className="note">{t('noMatches')}</div>
+      ) : p.counts && !query.trim() && hits.length === 0 ? (
+        <div className="note">{t('noUsedKeys')}</div>
       ) : (
         <div className={'klist' + (p.scroll ? ' scroll' : '')}
           onScroll={(e) => { const el = e.currentTarget; if (el.scrollTop + el.clientHeight > el.scrollHeight - 80 && shown.length < hits.length) setMore((m) => m + 1); }}>
@@ -1010,9 +1137,10 @@ export function KeyPicker(p: {
             return (
               <div key={h.key} className={'krow' + (sel.keys.includes(h.key) ? ' on' : '') + (p.selected === h.key ? ' picked' : '') + (isLocked ? ' locked' : '')} onClick={() => bind(h)}>
                 <div className="k">
-                  {p.onSelect && <span className={'radio' + (p.selected === h.key ? ' on' : '')} />}
+                  {p.onSelect && !p.plain && <span className={'radio' + (p.selected === h.key ? ' on' : '')} />}
                   <span className="kname"><Highlight text={h.key} q={query} /></span>
                   {sel.keys.includes(h.key) && <span className="tag">● {t('linked')}</span>}
+                  {p.counts && <span className={'tag use-n' + ((p.counts[h.key] ?? 0) ? '' : ' zero')}>{t('usedN', { n: p.counts[h.key] ?? 0 })}</span>}
                   {p.onUsage && (
                     <button className="btn ghost sm usage-btn" title={t('whereUsedHint')} onClick={(e) => { e.stopPropagation(); p.onUsage!(h.key); }}>{t('whereUsed')}</button>
                   )}
@@ -1035,31 +1163,57 @@ export function KeyPicker(p: {
   );
 }
 
-export function KeysView(p: { t: T; table: Table; mapping: Mapping; config: DocConfig; sel: SelectionInfo; report: Rep; pro: boolean; onUpgrade: (reason?: MsgKey) => void; usage: number; onShowUsage: (key: string) => void }) {
+/** Keys tab: find a key and step through every place it is used on this page. */
+export function KeysView(p: { t: T; table: Table; mapping: Mapping; config: DocConfig; sel: SelectionInfo; pro: boolean; onUpgrade: (reason?: MsgKey) => void;
+  usageList: { key: string; items: { id: string; text: string; where: string }[] } | null; counts: Record<string, number> | null }) {
   const { t, sel, mapping, pro } = p;
-  const [gen, setGen] = useState(true);
   const lang = p.config.currentLang ?? mapping.baseLang;
-  return (
+  const [key, setKey] = useState('');
+  const [idx, setIdx] = useState(-1);
+  const list = p.usageList && p.usageList.key === key ? p.usageList.items : null;
+  // How often each key is used on this page (refreshed when the tab opens and after changes)
+  useEffect(() => { send({ type: 'usage-counts' }); }, [sel.sig, key]);
+  const open = (k: string) => { setKey(k); setIdx(-1); send({ type: 'find-usage', key: k }); };
+  const go = (i: number) => {
+    if (!list || !list.length) return;
+    const n = Math.max(0, Math.min(list.length - 1, i));
+    setIdx(n); send({ type: 'focus', nodeId: list[n].id });
+  };
+  if (key) return (
     <div className="body">
       <div className="row between">
-        <span className="small muted">{sel.textCount ? t('keysHintSel', { n: sel.textCount }) : t('keysHintNone')}</span>
-        {sel.keyedCount > 0 && <button className="btn sm" onClick={() => send({ type: 'unbind' })}>{t('unlink')}</button>}
+        <button className="btn ghost sm" onClick={() => setKey('')}>‹ {t('usageBack')}</button>
+        <CopyButton text={key} title={t('copy')} />
       </div>
-      <KeyPicker t={t} table={p.table} mapping={mapping} lang={lang} sel={sel} pro={pro} onUpgrade={p.onUpgrade} strip={p.config.stripTags !== false} onUsage={p.onShowUsage} />
-      {(p.report?.source === 'bind' || p.report?.source === 'unbind') && <ReportView t={t} pro={pro} onUpgrade={p.onUpgrade} {...p.report} />}
-
       <div className="card stack">
-        <h2>{t('autoLinkTitle')}</h2>
-        <p className="small muted">{t('autoLinkDesc')}</p>
-        <button className="btn" onClick={() => send({ type: 'auto-link', table: p.table, mapping, scope: 'page' })}>{t('autoLinkBtn')}</button>
+        <code className="keyname">{key}</code>
+        {!list ? <span className="small muted"><Icon name="refresh" className="spin" size={12} /> …</span>
+          : list.length === 0 ? <span className="small muted">{t('usageNone')}</span>
+          : (
+            <>
+              <span className="small"><Em text={t('usageCount', { n: list.length })} n={list.length} /></span>
+              {list.length > 1 && <div className="row between review-nav">
+                <button className="btn sm" disabled={idx <= 0} onClick={() => go(idx - 1)}>‹ {t('prev')}</button>
+                <span className="small muted grow" style={{ textAlign: 'center' }}>{idx >= 0 ? t('navPos', { i: idx + 1, n: list.length }) : t('usageStart')}</span>
+                <button className="btn sm" disabled={idx >= list.length - 1} onClick={() => go(idx + 1)}>{t('next')} ›</button>
+              </div>}
+              <div className="klist scroll">
+                {list.map((it, i) => (
+                  <div key={it.id} className={'krow' + (i === idx ? ' picked' : '')} onClick={() => go(i)}>
+                    <div className="ftext">{it.text || t('emptyVal')}</div>
+                    {it.where && <div className="fkey">{it.where}</div>}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
       </div>
-
-      <div className="card stack">
-        <h2>{t('exportTitle')}</h2>
-        <p className="small muted">{t('exportDesc', { lang: mapping.baseLang })}</p>
-        <label className="check"><input type="checkbox" checked={gen} onChange={(e) => setGen(e.target.checked)} /><span>{t('exportGen')}</span></label>
-        <button className="btn" onClick={() => send({ type: 'export', scope: 'page', generateKeys: gen, baseLang: mapping.baseLang })}>{t('exportBtn')}</button>
-      </div>
+    </div>
+  );
+  return (
+    <div className="body">
+      <span className="small muted">{t('usageHint')}</span>
+      <KeyPicker t={t} table={p.table} mapping={mapping} lang={lang} sel={sel} pro={pro} onUpgrade={p.onUpgrade} strip={p.config.stripTags !== false} onSelect={open} plain counts={p.counts ?? {}} />
     </div>
   );
 }
@@ -1079,12 +1233,12 @@ export function PlanSheet({ t, plan, reason, usage, onClose }: { t: T; plan: Pla
         <div className="row between"><b style={{ fontSize: 14 }}>{t('planTitle')}</b><button className="btn ghost sm" onClick={onClose}>{t('close')}</button></div>
         {reason && <div className="note pro">{t(reason, { max: FREE.maxKeys, n: usage })}</div>}
         <div className="usage-big">
-          <div className="row between small"><span>{t('usageThisFile')}</span><b>{pro ? usage : `${usage} / ${FREE.maxKeys}`}</b></div>
+          <div className="row between small"><span>{t('usageThisFile')}</span><b>{pro ? <>{usage} / <Icon name="infinity" size={14} className="inf" /></> : `${usage} / ${FREE.maxKeys}`}</b></div>
           {!pro && <div className="bar"><i style={{ width: pct + '%' }} className={usage >= FREE.maxKeys ? 'full' : ''} /></div>}
         </div>
         <div className="tiers">
           {tiers.map((x) => (
-            <div key={x.id} className={'tier' + (x.highlight ? ' hl' : '') + (x.current ? ' cur' : '')}>
+            <div key={x.id} className={'tier t-' + x.id + (x.highlight ? ' hl' : '') + (x.current ? ' cur' : '')}>
               <div className="row between"><b>{x.name}</b>{x.current && <span className="pill cur">{t('currentPlan')}</span>}</div>
               <div className="tprice">{x.price}{x.per && <small> {x.per}</small>}</div>
               {x.sub && <span className="small muted">{x.sub}</span>}

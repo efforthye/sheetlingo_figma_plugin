@@ -1,5 +1,7 @@
 # Publishing Sheetlingo on Figma Community (paid)
 
+**Live listing:** https://www.figma.com/community/plugin/1686971732936550159/sheetlingo-google-sheets-csv-localization-sync (plugin id `1686971732936550159`, submitted 2026-10-01, first version under review)
+
 ## Before you start (one time)
 
 - Use the **personal** Figma account (efforthye@gmail.com) in the **Figma desktop app**, logged in on Windows.

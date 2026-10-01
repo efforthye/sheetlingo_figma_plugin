@@ -14,8 +14,11 @@ const paths: Record<string, string> = {
   refresh: 'M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3',
   // Lucide "settings" (ISC) — 24×24 box, scaled below
   gear: 'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2zM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
+  // Lucide "infinity" (ISC) — 24×24 box
+  infinity: 'M12 12c-2-2.67-4-4-6-4a4 4 0 1 0 0 8c2 0 4-1.33 6-4Zm0 0c2 2.67 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.33-6 4Z',
   back: 'M10 3.5 5.5 8l4.5 4.5',
   x: 'M4 4l8 8M12 4l-8 8',
+  download: 'M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10',
   info: 'M8 14.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM8 7.2v4M8 4.9v.01',
   minimize: 'M2.5 9.5h4v4M13.5 6.5h-4v-4M2.5 13.5 6.5 9.5M13.5 2.5 9.5 6.5',
   expand: 'M9.5 3.5h3v3M6.5 12.5h-3v-3M12.5 3.5 9 7M3.5 12.5 7 9',
@@ -25,8 +28,8 @@ const paths: Record<string, string> = {
   link: 'M6.5 9.5l3-3M7 4.5l1-1a2.8 2.8 0 0 1 4 4l-1 1M9 11.5l-1 1a2.8 2.8 0 0 1-4-4l1-1',
 };
 export const Icon = ({ name, size = 16, className }: { name: keyof typeof paths | string; size?: number; className?: string }) => (
-  <svg width={size} height={size} viewBox={name === 'gear' ? '0 0 24 24' : '0 0 16 16'} fill="none" stroke="currentColor"
-    strokeWidth={name === 'gear' ? 2.1 : 1.4} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+  <svg width={size} height={size} viewBox={name === 'gear' || name === 'infinity' ? '0 0 24 24' : '0 0 16 16'} fill="none" stroke="currentColor"
+    strokeWidth={name === 'gear' ? 2.1 : name === 'infinity' ? 2.4 : 1.4} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
     <path d={paths[name]} />
   </svg>
 );
@@ -86,7 +89,7 @@ function reasonText(r: string | undefined, t: T): string {
   return '';
 }
 
-function IssueList({ title, items, tone, t }: { title: string; items: Issue[]; tone: 'warn' | 'err'; t: T }) {
+function IssueList({ title, items, tone, t }: { title: string; items: Issue[]; tone: 'warn' | 'err' | 'soft'; t: T }) {
   if (!items?.length) return null;
   return (
     <details className={'issues ' + tone}>
@@ -130,6 +133,68 @@ export function ReportView({ report, source, t, pro, onUpgrade }: { report: Repo
       {report.limited > 0 && (
         <div className="note pro">{source === 'fill' ? t('rLimited', { n: report.limited }) : t('rLimitedKeys', { n: report.limited, max: FREE.maxKeys })}<button className="btn sm pro" onClick={() => onUpgrade(source === 'fill' ? 'upFill' : 'upKey')}>{t('unlock')}</button></div>
       )}
+    </div>
+  );
+}
+
+/** Calm, success-first result dialog: what got done on top, things worth a look below. */
+export function ResultSheet({ t, source, report, lang, undoable, onUndo, onClose }: {
+  t: T; source: ReportSource; report: Report; lang: string; undoable: boolean; onUndo: () => void; onClose: () => void;
+}) {
+  const r = report;
+  const did = r.updated > 0 || r.linkedNew > 0;
+  const title = source === 'fill' ? t('toastFilled', { n: r.updated })
+    : source === 'bind' ? t('toastLinked', { n: r.updated })
+    : source === 'unbind' ? t('toastUnlinked', { n: r.updated })
+    : did ? t('doneTitle') : r.failed.length ? t('doneFailed') : t('doneNone');
+  // Sync results read as a short list: what changed, what was already the same, what got linked
+  const bullets = source === 'sync' ? [
+    r.updated > 0 && t('bChanged', { n: r.updated, lang }),
+    r.unchanged > 0 && t('bSame', { n: r.unchanged }),
+    r.linkedNew > 0 && t('bLinked', { n: r.linkedNew }),
+  ].filter(Boolean) as string[] : [];
+  const fonts = r.failed.filter((i) => i.reason?.startsWith('font'));
+  const locked = r.failed.filter((i) => !i.reason?.startsWith('font'));
+  // Not applied at all (failures) vs applied but worth a look
+  const failGroups: [string, Issue[]][] = [[t('failFont'), fonts], [t('failLocked'), locked], [t('chkMissing'), r.missing]];
+  const checkGroups: [string, Issue[]][] = [[t('chkOverflow'), r.overflow], [t('chkFallback'), r.fallback], [t('chkAmbiguous'), r.ambiguous]];
+  const nFail = failGroups.reduce((a, [, g]) => a + g.length, 0);
+  const nCheck = checkGroups.reduce((a, [, g]) => a + g.length, 0);
+  const fontNames = [...new Set(fonts.map((i) => (i.reason ?? '').replace(/^font:/, '')))].filter(Boolean).join(', ');
+  return (
+    <div className="sheet result-sheet" onClick={(e) => e.stopPropagation()}>
+      <div className="result-head">
+        {did
+          ? <svg className="mark" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" /><path d="M12.5 20.5l5 5 10-11" /></svg>
+          : <span className={'mark-info' + (nFail ? ' fail' : '')}><Icon name={nFail ? 'x' : 'info'} size={18} /></span>}
+        <div className="grow">
+          <b>{title}</b>
+          {bullets.length > 0 ? (
+            <ul className="result-bullets small">{bullets.map((b) => <li key={b}>{b}</li>)}</ul>
+          ) : <span className="small muted">{[
+            r.unchanged > 0 && t('doneSame', { n: r.unchanged }),
+            r.linkedNew > 0 && t('rLinkedNew', { n: r.linkedNew }),
+          ].filter(Boolean).join(' · ')}</span>}
+        </div>
+      </div>
+      {nFail > 0 && (
+        <div className="result-check fail">
+          <div className="small"><b>{t('failItems', { n: nFail })}</b></div>
+          {failGroups.map(([title, items]) => <IssueList key={title} title={title} items={items} tone="err" t={t} />)}
+          {fonts.length > 0 && <span className="small">{t('fontNeeded', { fonts: fontNames })}</span>}
+        </div>
+      )}
+      {nCheck > 0 && (
+        <div className="result-check">
+          <div className="small muted">{t('checkItems', { n: nCheck })}</div>
+          {checkGroups.map(([title, items]) => <IssueList key={title} title={title} items={items} tone="soft" t={t} />)}
+        </div>
+      )}
+      {r.limited > 0 && <div className="note pro small">{t('rLimitedKeys', { n: r.limited, max: FREE.maxKeys })}</div>}
+      <div className="row result-actions">
+        {undoable && <button className="btn ghost sm" onClick={onUndo}>{t('undo')}</button>}
+        <span className="sp" /><button className="btn primary sm" onClick={onClose}>{t('done')}</button>
+      </div>
     </div>
   );
 }

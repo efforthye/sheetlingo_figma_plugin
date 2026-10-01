@@ -3,14 +3,15 @@ import { autoLink, bindSelection, unbindSelection } from './bind';
 import { exportLayers } from './export';
 import { fillCards, fillText } from './fill';
 import { devSetTier, getPlan, isPro, loadDevTier, loadLocalTrial, loadWasPro, upgrade } from './payments';
-import { collectSame, collectText, getFill, getKey, linkedKeys, readingOrder, recountKeys, whereOf } from './nodes';
+import { collectSame, collectText, getFill, getKey, linkedKeys, readingOrder, recountKeys, registerKeys, setSheetKeys, unregisterIfUnused, whereOf } from './nodes';
 import { FREE } from '../shared/constants';
-import { buildDict } from '../shared/dict';
+import { buildDict, stripTags } from '../shared/dict';
 import { getSelectionInfo } from './selection';
 import { loadConfig, loadTable, saveConfig, saveTable } from './storage';
 import { syncScope } from './sync';
-import { resetMissingFonts } from './text';
+import { resetMissingFonts, setText } from './text';
 import { setWatchDict, watchEdits } from './watch';
+import { beginJournal, endJournal, undoLast } from './undo';
 
 const command = figma.command || 'open';
 // right-panel "Sheetlingo key" button (command 'key') simply opens the full plugin
@@ -18,7 +19,12 @@ figma.showUI(__html__, { width: 400, height: 660, themeColors: true, visible: co
 figma.clientStorage.getAsync('uiSize').then((s) => { if (s && s.w && s.h) figma.ui.resize(s.w, s.h); }).catch(() => {});
 try { figma.root.setRelaunchData({ open: '', resync: '' }); } catch (_) { /* ignore */ }
 
-const post = (m: CodeToUi) => figma.ui.postMessage(m);
+const post = (m: CodeToUi) => {
+  // A visible result closes the undo journal for the operation that produced it.
+  if (m.type === 'report' && !m.silent) m = { ...m, undoable: endJournal() > 0 };
+  figma.ui.postMessage(m);
+};
+const JOURNALED = new Set(['sync', 'fill-text', 'fill-cards', 'bind', 'auto-link', 'unbind']);
 const postSelection = () => post({ type: 'selection', selection: getSelectionInfo() });
 const postUsage = () => post({ type: 'usage', linkedKeys: linkedKeys().length });
 
@@ -39,6 +45,7 @@ const overLimit = () => !isPro() && linkedKeys().length > FREE.maxKeys;
 
 figma.ui.onmessage = async (msg: UiToCode) => {
   resetMissingFonts();
+  if (JOURNALED.has(msg.type) && !(msg.type === 'sync' && msg.silent)) beginJournal();
   try {
     if (LOCKED.has(msg.type) && overLimit()) {
       if (msg.type === 'sync' && msg.silent) return; // live sync just stops quietly
@@ -58,7 +65,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'sync': {
         setWatchDict(msg.table, msg.mapping);
         const report = await syncScope({ table: msg.table, mapping: msg.mapping, lang: msg.lang, scope: effectiveScope(msg.scope), pro: isPro(), strip: msg.stripTags ?? loadConfig().stripTags !== false,
-          autoLink: msg.autoLink ?? loadConfig().autoLinkOnApply !== false, rename: loadConfig().renameOnBind, same: msg.same, ids: msg.ids });
+          autoLink: msg.autoLink ?? true, rename: loadConfig().renameOnBind, same: msg.same, ids: msg.ids,
+          onProgress: msg.silent ? undefined : (done, total) => post({ type: 'progress', done, total }) });
         post({ type: 'report', source: 'sync', report, silent: msg.silent });
         postUsage();
         break;
@@ -79,8 +87,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const report = await bindSelection(msg.key, msg.value, cfg.renameOnBind, isPro(), msg.ids);
         if (msg.sync) {
           const r2 = await syncScope({ ...msg.sync, pro: isPro(), strip: msg.sync.stripTags ?? cfg.stripTags !== false,
-            autoLink: cfg.autoLinkOnApply !== false, rename: cfg.renameOnBind });
-          r2.linkedNew += report.updated;
+            autoLink: true, rename: cfg.renameOnBind });
+          // One result for "link + apply": texts the link step already rewrote count as changed, not "unchanged".
+          const pre = report.changedText ?? 0;
+          r2.updated += pre;
+          r2.unchanged = Math.max(0, r2.unchanged - pre);
+          r2.linkedNew += report.newlyLinked ?? 0;
           r2.failed.push(...report.failed);
           post({ type: 'report', source: 'sync', report: r2 });
         } else {
@@ -93,6 +105,15 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'auto-link': {
         const report = await autoLink(msg.table, msg.mapping, effectiveScope(msg.scope), loadConfig().renameOnBind, isPro());
         post({ type: 'report', source: 'bind', report });
+        postSelection();
+        postUsage();
+        break;
+      }
+      case 'undo': {
+        const { restored, keys } = await undoLast(setText);
+        registerKeys(keys);
+        unregisterIfUnused(keys);
+        post({ type: 'undone', restored });
         postSelection();
         postUsage();
         break;
@@ -111,13 +132,18 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'select-next-unlinked': {
+        const sheetKeys = msg.keys ? new Set(msg.keys) : null;
         // visible on screen (absoluteRenderBounds is null when the node or a parent is hidden) and not locked
         const isLocked = (n: BaseNode | null): boolean => {
           for (let p: BaseNode | null = n; p && p.type !== 'PAGE'; p = p.parent) if ('locked' in p && (p as SceneNode).locked) return true;
           return false;
         };
         const texts = readingOrder(figma.currentPage.findAllWithCriteria({ types: ['TEXT'] })
-          .filter((n) => n.absoluteRenderBounds && n.characters.trim() && !getKey(n) && !getFill(n) && !isLocked(n)));
+          .filter((n) => {
+            if (!n.absoluteRenderBounds || !n.characters.trim() || getFill(n) || isLocked(n)) return false;
+            const k = getKey(n);
+            return !k || (!!sheetKeys && !sheetKeys.has(k)); // a key that isn't in the sheet is not a real link
+          }));
         if (!texts.length) { post({ type: 'next-result', remaining: 0 }); break; }
         const cur = figma.currentPage.selection[0];
         const dir = msg.dir ?? 1;
@@ -127,12 +153,17 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           const b = cur.absoluteBoundingBox;
           idx = b ? texts.findIndex((n) => { const nb = n.absoluteBoundingBox; return !!nb && (nb.y > b.y + 1 || (Math.abs(nb.y - b.y) <= 1 && nb.x > b.x)); }) - (dir > 0 ? 1 : 0) : -1;
         }
+        if (msg.peek) { // only report where the current selection sits, don't move
+          const here = !!cur && texts[idx]?.id === cur.id;
+          post({ type: 'next-result', remaining: texts.length, index: idx, here });
+          break;
+        }
         const ni = ((idx + dir) % texts.length + texts.length) % texts.length;
         const next = texts[ni];
         figma.currentPage.selection = [next];
         figma.viewport.scrollAndZoomIntoView([next]);
         postSelection();
-        post({ type: 'next-result', remaining: texts.length, index: ni });
+        post({ type: 'next-result', remaining: texts.length, index: ni, here: true });
         break;
       }
       case 'focus': {
@@ -153,7 +184,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'open-url': figma.openExternal(msg.url); break;
       case 'auth-save': await figma.clientStorage.setAsync('googleAuth', msg.auth); break;
       case 'scope-info': {
-        if (msg.scope === 'document' && !msg.same) break;
         const areaNames = () => msg.scope === 'selection' ? figma.currentPage.selection.map((n) => n.name)
           : msg.scope === 'document' ? ['*'] : [figma.currentPage.name];
         if (msg.same) {
@@ -168,6 +198,27 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           break;
         }
         const nodes = await collectText(msg.scope);
+        if (msg.scope === 'document') {
+          // All pages: count what would change for the chosen language (shown in the confirm step)
+          const cfg = loadConfig();
+          const tbl = await loadTable();
+          const dict = tbl && cfg.mapping ? buildDict(tbl, cfg.mapping).dict : {};
+          const lang = msg.lang || cfg.currentLang || cfg.mapping?.baseLang || '';
+          const strip = cfg.stripTags !== false;
+          let linked = 0, change = 0;
+          for (const n of nodes) {
+            if (getFill(n)) continue;
+            const k = getKey(n);
+            if (!k) continue;
+            linked++;
+            const e = dict[k];
+            const raw = e ? e[lang] || (cfg.mapping ? e[cfg.mapping.baseLang] : '') : undefined;
+            const v = raw !== undefined && strip ? stripTags(raw) : raw;
+            if (v !== undefined && v !== n.characters) change++;
+          }
+          post({ type: 'scope-info', info: { scope: 'document', names: ['*'], linked, unlinked: 0, items: [], willChange: change } });
+          break;
+        }
         let linked = 0, unlinked = 0;
         const picked: TextNode[] = [];
         for (const n of nodes) {
@@ -179,9 +230,28 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         post({ type: 'scope-info', info: { scope: msg.scope, names, linked, unlinked, items } });
         break;
       }
+      case 'get-selection': postSelection(); break;
+      case 'usage-counts': {
+        const counts: Record<string, number> = {};
+        for (const n of figma.currentPage.findAllWithCriteria({ types: ['TEXT'], sharedPluginData: { namespace: 'sheetlingo', keys: ['key'] } })) {
+          const k = n.getSharedPluginData('sheetlingo', 'key');
+          if (k) counts[k] = (counts[k] ?? 0) + 1;
+        }
+        post({ type: 'usage-counts', counts });
+        break;
+      }
+      case 'find-usage': {
+        // Every text on this page linked to the key, in reading order (for Prev / Next on the canvas)
+        const nodes = readingOrder(figma.currentPage.findAllWithCriteria({ types: ['TEXT'], sharedPluginData: { namespace: 'sheetlingo', keys: ['key'] } })
+          .filter((n) => n.getSharedPluginData('sheetlingo', 'key') === msg.key));
+        post({ type: 'usage-list', key: msg.key, items: nodes.slice(0, 500).map((n) => ({ id: n.id, text: n.characters.slice(0, 120), where: whereOf(n) })) });
+        break;
+      }
+      case 'sheet-keys': setSheetKeys(msg.keys); postUsage(); postSelection(); break;
       case 'recount-keys': {
-        await recountKeys();
+        const r = await recountKeys();
         postUsage();
+        post({ type: 'recount-done', ...r });
         break;
       }
       case 'mini': figma.ui.resize(300, 56); break;
@@ -200,6 +270,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'close': figma.closePlugin(); break;
     }
   } catch (e) {
+    endJournal();
     console.error('[Sheetlingo]', e);
     post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
   }

@@ -60,7 +60,7 @@ export interface GoogleAuth {
   refresh: string | null; // encrypted by the auth server
 }
 
-export const DEFAULT_CONFIG: DocConfig = { renameOnBind: true, autoSync: false, stripTags: true };
+export const DEFAULT_CONFIG: DocConfig = { renameOnBind: true, autoSync: true, stripTags: true };
 
 export interface PlanInfo {
   tier: Tier;
@@ -81,12 +81,14 @@ export interface SelectionInfo {
   /** Linked text layers inside selected frames/groups (capped). */
   inside: { nodeId: string; key: string; text: string }[];
   insideCount: number;
+  /** Texts inside the selected frames that aren't linked. */
+  insideUnlinked?: number;
   /** Ids of the selected nodes — changes whenever the selection changes. */
   sig: string;
 }
 
 export interface TargetItem { id: string; text: string; where: string; key: string }
-export interface ScopeInfo { scope: Scope; names: string[]; linked: number; unlinked: number; items: TargetItem[] }
+export interface ScopeInfo { scope: Scope; names: string[]; linked: number; unlinked: number; items: TargetItem[]; /** Counted by the main thread for the whole scope (all pages). */ willChange?: number }
 
 export interface Issue {
   nodeId: string;
@@ -111,10 +113,14 @@ export interface Report {
   unmatched: number;
   limited: number;
   overflowChecked: boolean;
+  /** bind only: texts whose wording changed / that got a key they didn't have. */
+  changedText?: number;
+  newlyLinked?: number;
 }
 
 export type UiToCode =
   | { type: 'ui-ready' }
+  | { type: 'undo' }
   | { type: 'save-config'; config: DocConfig }
   | { type: 'cache-table'; table: Table }
   | { type: 'sync'; table: Table; mapping: Mapping; lang: string; scope: Scope; silent?: boolean; stripTags?: boolean; autoLink?: boolean; same?: SameRef; ids?: string[] }
@@ -132,11 +138,15 @@ export type UiToCode =
   | { type: 'open-url'; url: string }
   | { type: 'auth-save'; auth: GoogleAuth | null }
   | { type: 'resize'; width: number; height: number }
-  | { type: 'select-next-unlinked'; dir?: 1 | -1 }
+  | { type: 'select-next-unlinked'; dir?: 1 | -1; keys?: string[]; peek?: boolean }
   | { type: 'expand' }
   | { type: 'mini' }
   | { type: 'recount-keys' }
-  | { type: 'scope-info'; scope: Scope; same?: SameRef }
+  | { type: 'get-selection' }
+  | { type: 'find-usage'; key: string }
+  | { type: 'usage-counts' }
+  | { type: 'sheet-keys'; keys: string[] }
+  | { type: 'scope-info'; scope: Scope; same?: SameRef; lang?: string }
   | { type: 'close' };
 
 export type ReportSource = 'sync' | 'fill' | 'bind' | 'unbind';
@@ -154,12 +164,17 @@ export type CodeToUi =
     }
   | { type: 'selection'; selection: SelectionInfo }
   | { type: 'plan'; plan: PlanInfo }
-  | { type: 'report'; source: ReportSource; report: Report; silent?: boolean }
+  | { type: 'report'; source: ReportSource; report: Report; silent?: boolean; undoable?: boolean }
+  | { type: 'undone'; restored: number }
+  | { type: 'recount-done'; n: number; byData: number; byName: number; pages: number }
   | { type: 'export-result'; csv: string; rows: number; generated: number }
-  | { type: 'next-result'; remaining: number; index?: number }
+  | { type: 'next-result'; remaining: number; index?: number; here?: boolean }
   | { type: 'usage'; linkedKeys: number }
   | { type: 'auto-unlinked'; name: string; key: string }
   | { type: 'scope-info'; info: ScopeInfo }
+  | { type: 'progress'; done: number; total: number }
+  | { type: 'usage-counts'; counts: Record<string, number> }
+  | { type: 'usage-list'; key: string; items: { id: string; text: string; where: string }[] }
   | { type: 'error'; message: string };
 
 export function emptyReport(): Report {

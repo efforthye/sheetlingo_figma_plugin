@@ -1,3 +1,4 @@
+import { parseRaw } from './sheet';
 import { AUTH_SERVER } from '../shared/config';
 import type { GoogleAuth } from '../shared/types';
 import { send } from './bridge';
@@ -7,7 +8,7 @@ export class GoogleError extends Error {
   constructor(public code: GoogleErrorCode, detail = '') { super(code + (detail ? ': ' + detail : '')); }
 }
 
-export interface PickedFile { id: string; name: string }
+export interface PickedFile { id: string; name: string; mime?: string }
 export interface Tab { id: number; title: string }
 
 const randomKey = () => {
@@ -67,6 +68,17 @@ async function api(token: string, url: string) {
   if (res.status === 400) throw new GoogleError('tab-missing');
   if (!res.ok) throw new GoogleError('network', String(res.status));
   return res.json();
+}
+
+/** A CSV file stored in Google Drive (picked in the Picker): downloaded as text. */
+export async function fetchDriveCsv(token: string, fileId: string): Promise<string[][]> {
+  let res: Response;
+  try { res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`, { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' }); }
+  catch (_) { throw new GoogleError('network'); }
+  if (res.status === 401) throw new GoogleError('auth');
+  if (res.status === 403 || res.status === 404) throw new GoogleError('no-access');
+  if (!res.ok) throw new GoogleError('network', String(res.status));
+  return parseRaw(await res.text());
 }
 
 export async function listTabs(token: string, fileId: string): Promise<{ title: string; tabs: Tab[] }> {

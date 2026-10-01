@@ -11,6 +11,10 @@
 </p>
 
 <p align="center">
+  <a href="https://www.figma.com/community/plugin/1686971732936550159/sheetlingo-google-sheets-csv-localization-sync"><b>▶ Get Sheetlingo on Figma Community</b></a>
+</p>
+
+<p align="center">
   <img src="docs/listing/00-cover.png" width="820" alt="Sheetlingo cover" />
 </p>
 

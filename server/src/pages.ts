@@ -108,11 +108,11 @@ export function pickerPage(cfg: { key: string; token: string; apiKey: string; ap
   `<script>const C=${JSON.stringify(cfg).replace(/</g, '\\u003c')};
 const show=id=>{for(const x of ['pick','ok','bad'])document.getElementById(x).classList.toggle('hide',x!==id)};
 function openPicker(){
-  const view=new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS).setMode(google.picker.DocsViewMode.LIST);
+  const view=new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS).setMimeTypes('application/vnd.google-apps.spreadsheet,text/csv').setMode(google.picker.DocsViewMode.LIST);
   if(C.hint) view.setFileIds(C.hint);
   new google.picker.PickerBuilder().addView(view).setOAuthToken(C.token).setDeveloperKey(C.apiKey).setAppId(C.appId)
    .setCallback(async d=>{ if(d.action!==google.picker.Action.PICKED) return; const f=d.docs[0];
-     const r=await fetch('/auth/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:C.key,id:f.id,name:f.name})});
+     const r=await fetch('/auth/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:C.key,id:f.id,name:f.name,mime:f.mimeType})});
      if(r.ok){document.getElementById('fn').textContent=f.name;show('ok');}else show('bad'); }).build().setVisible(true);
 }
 </script><script src="https://apis.google.com/js/api.js" onload="gapi.load('picker',openPicker)"></script>`);

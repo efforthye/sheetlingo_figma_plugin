@@ -29,15 +29,24 @@ export async function bindSelection(key: string, value: string | undefined, rena
   }
   registerKeys([key]);
   report.total = texts.length;
+  report.changedText = 0; report.newlyLinked = 0;
   for (const n of texts) {
+    const prevKey = n.getSharedPluginData('sheetlingo', 'key');
+    const isNew = getKey(n) !== key;
     setData(n, 'key', key);
     setData(n, 'fill', '');
     setKeyBadge(n, key);
     if (rename) { try { n.name = '#' + key; } catch (_) { /* instance sublayer */ } }
     if (value !== undefined) {
       const r = await setText(n, value);
-      if (r === 'font' || r === 'locked') { report.failed.push(issue(n, key, failTag(r))); continue; }
+      if (r === 'font' || r === 'locked') {
+        // Text can't be changed here: undo the link so nothing is left half-done
+        setData(n, 'key', prevKey); setKeyBadge(n, prevKey);
+        report.failed.push(issue(n, key, failTag(r))); continue;
+      }
+      if (r === 'ok') report.changedText++;
     }
+    if (isNew) report.newlyLinked = (report.newlyLinked ?? 0) + 1;
     report.updated++;
   }
   unregisterIfUnused(prev.filter((k) => k !== key));

@@ -53,6 +53,12 @@ export const isPro = () => getPlan().tier !== 'free';
 export async function upgrade() {
   const p = payments();
   if (!p) { figma.notify('Payments are not enabled for this plugin yet.'); return; }
-  await p.initiateCheckoutAsync({ interstitial: 'PAID_FEATURE' });
+  const t0 = Date.now();
+  try { await p.initiateCheckoutAsync({ interstitial: 'PAID_FEATURE' }); }
+  catch (_) { /* fall through to the notice below */ }
+  // Development copies (imported from manifest) can't open Figma's checkout: it returns at once with no change.
+  if (p.status.type !== 'PAID' && Date.now() - t0 < 800) {
+    figma.notify('Checkout opens in the Community version of Sheetlingo. This is a development copy.', { timeout: 5000 });
+  }
 }
 

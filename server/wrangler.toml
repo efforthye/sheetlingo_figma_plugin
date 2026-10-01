@@ -9,6 +9,15 @@ preview_urls = false
 binding = "PENDING"
 id = "6d663c38727b489786939633c83d29c7"
 
+# Strongly consistent sign-in hand-off (free plan supports SQLite-backed Durable Objects)
+[[durable_objects.bindings]]
+name = "PEND"
+class_name = "PendingStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PendingStore"]
+
 [vars]
 GOOGLE_CLIENT_ID = "729315461169-mlh1cadg7e90nq0m11mdmaghco09nmo2.apps.googleusercontent.com"
 GOOGLE_API_KEY = "AIzaSyBfa_vKBnfQHFNxzIg8BQO-mGeyuCPoBKM"

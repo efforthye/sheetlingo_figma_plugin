@@ -1,24 +1,32 @@
+import { touch } from './undo';
 import { NS } from '../shared/constants';
 import type { Issue, SameRef, Scope } from '../shared/types';
 import { normText, stripTags } from '../shared/dict';
 
+const FILL_OFF = true;
+
 export interface FillBinding { c: string; r: number }
 
 export function getKey(n: TextNode): string {
-  const k = n.getSharedPluginData(NS, 'key');
-  if (k) return k;
-  const name = n.name.trim();
-  return name.startsWith('#') ? name.slice(1).trim() : '';
+  // Only a link made by Sheetlingo counts. Layer names (e.g. a designer's "#thumbnail.nav") are not keys.
+  return n.getSharedPluginData(NS, 'key');
 }
 
 export function getFill(n: TextNode): FillBinding | null {
+  // The Fill tab was removed: texts filled earlier behave like any other text (can be linked, listed, unlinked).
+  if (FILL_OFF) return null;
   const raw = n.getSharedPluginData(NS, 'fill');
   if (!raw) return null;
   try { return JSON.parse(raw); } catch (_) { return null; }
 }
 
 export function setData(n: BaseNode, key: string, value: string) {
-  try { n.setSharedPluginData(NS, key, value); } catch (_) { /* read-only node */ }
+  if (key === 'key' || key === 'lang' || key === 'fill') touch(n);
+  try {
+    n.setSharedPluginData(NS, key, value);
+    // Linking stamps the current wording; unlinking clears it.
+    if (key === 'key' && n.type === 'TEXT') n.setSharedPluginData(NS, 'txt', value ? (n as TextNode).characters : '');
+  } catch (_) { /* read-only node */ }
 }
 
 export function issue(n: SceneNode, key?: string, reason?: string): Issue {
@@ -69,12 +77,21 @@ export function readingOrder<T extends SceneNode>(nodes: T[]): T[] {
  * keys are added when linked (bind / auto-link / extract / first sync) and removed on unlink
  * when no other layer on the current page still uses them.
  */
-export function linkedKeys(): string[] {
+function rawKeys(): string[] {
   try { return JSON.parse(figma.root.getSharedPluginData(NS, 'keys') || '[]'); } catch (_) { return []; }
+}
+/** Keys of the connected sheet (sent by the UI). A link only counts when its key is in the sheet. */
+let sheetKeys: Set<string> | null = null;
+export function setSheetKeys(keys: string[]) { sheetKeys = keys.length ? new Set(keys) : null; }
+/** A key counts as linked only when it exists in the connected sheet (unknown sheet → any key). */
+export const isSheetKey = (k: string) => !!k && (!sheetKeys || sheetKeys.has(k));
+export function linkedKeys(): string[] {
+  const all = rawKeys();
+  return sheetKeys ? all.filter((k) => sheetKeys!.has(k)) : all;
 }
 function saveKeys(keys: string[]) { figma.root.setSharedPluginData(NS, 'keys', JSON.stringify(keys)); }
 export function registerKeys(keys: string[]) {
-  const cur = linkedKeys();
+  const cur = rawKeys();
   const set = new Set(cur);
   let changed = false;
   for (const k of keys) if (k && !set.has(k)) { set.add(k); cur.push(k); changed = true; }
@@ -87,7 +104,7 @@ export function unregisterIfUnused(keys: string[]) {
     if (k) still.add(k);
   }
   const drop = new Set(keys.filter((k) => !still.has(k)));
-  if (drop.size) saveKeys(linkedKeys().filter((k) => !drop.has(k)));
+  if (drop.size) saveKeys(rawKeys().filter((k) => !drop.has(k)));
 }
 
 /** Shows the linked key in Figma's right panel (relaunch section) when the layer is selected. */
@@ -102,8 +119,9 @@ export function setKeyBadge(n: SceneNode, key: string) {
  * Texts linked to the same key but with different wording are ignored.
  */
 export function collectSame(ref: SameRef, values: string[], nodes?: TextNode[]): { linked: TextNode[]; unlinked: TextNode[] } {
-  // The base wording, plus the key's own sheet values (so it still works after switching language)
-  const targets = new Set([normText(ref.text), ...values.map((v) => normText(stripTags(v)))].filter(Boolean));
+  // Only texts with exactly the selected wording. (Sheet values are a fallback when no base text is known.)
+  const base = normText(ref.text);
+  const targets = new Set((base ? [base] : values.map((v) => normText(stripTags(v)))).filter(Boolean));
   const linked: TextNode[] = [], unlinked: TextNode[] = [];
   if (!targets.size) return { linked, unlinked };
   for (const n of nodes ?? figma.currentPage.findAllWithCriteria({ types: ['TEXT'] })) {
@@ -125,15 +143,21 @@ export function whereOf(n: BaseNode): string {
 }
 
 /** Explicit, user-triggered full scan (can be slow on big files): rebuilds the key registry from real layers. */
-export async function recountKeys(): Promise<number> {
+export async function recountKeys(): Promise<{ n: number; byData: number; byName: number; pages: number }> {
   await figma.loadAllPagesAsync();
   const seen = new Set<string>();
+  const data = new Set<string>(), named = new Set<string>(), pages = new Set<string>();
   for (const n of figma.root.findAllWithCriteria({ types: ['TEXT'] })) {
     if (getFill(n)) continue;
     const k = getKey(n);
-    if (k) seen.add(k);
+    if (!k || (sheetKeys && !sheetKeys.has(k))) continue;
+    seen.add(k);
+    if (n.getSharedPluginData(NS, 'key')) data.add(k); else named.add(k);
+    let p: BaseNode | null = n.parent;
+    while (p && p.type !== 'PAGE') p = p.parent;
+    if (p) pages.add(p.id);
   }
   const keys = Array.from(seen);
   figma.root.setSharedPluginData(NS, 'keys', JSON.stringify(keys));
-  return keys.length;
+  return { n: keys.length, byData: data.size, byName: named.size, pages: pages.size };
 }

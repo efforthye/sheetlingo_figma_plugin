@@ -1,3 +1,4 @@
+import { touch } from './undo';
 const loaded = new Set<string>();
 
 /** Texts the plugin itself is writing (so the edit watcher can tell them apart from user edits). */
@@ -13,9 +14,14 @@ let lastDetail = '';
 /** "font:Wanted Sans/Bold" or "locked:<message>" — for the report. */
 export const failTag = (r: SetResult) => r + (lastDetail ? ':' + lastDetail : '');
 
+/** Remembers the wording the plugin last put (or confirmed) on a linked text, so any later hand edit is detectable. */
+export function markSynced(node: TextNode) {
+  try { if (node.getSharedPluginData('sheetlingo', 'key')) node.setSharedPluginData('sheetlingo', 'txt', node.characters); } catch (_) { /* read-only */ }
+}
+
 export async function setText(node: TextNode, text: string): Promise<SetResult> {
   lastDetail = '';
-  if (node.characters === text) return 'same';
+  if (node.characters === text) { markSynced(node); return 'same'; }
   const len = node.characters.length;
   let fonts: FontName[] = [];
   try {
@@ -29,8 +35,10 @@ export async function setText(node: TextNode, text: string): Promise<SetResult> 
     catch (_) { missing.add(id); lastDetail = id; return 'font'; }
   }
   try {
+    touch(node);
     pluginWrites.set(node.id, text);
     node.characters = text;
+    markSynced(node);
     return 'ok';
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

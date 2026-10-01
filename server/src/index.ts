@@ -14,6 +14,8 @@
 
 export interface Env {
   PENDING: KVNamespace;
+  /** Strongly consistent hand-off store (KV can serve stale reads for ~60 s at an edge). */
+  PEND?: DurableObjectNamespace;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
   GOOGLE_API_KEY: string;
@@ -73,6 +75,44 @@ function emailFromIdToken(idToken?: string): string {
   try { return JSON.parse(new TextDecoder().decode(unb64u(idToken!.split('.')[1]))).email ?? ''; } catch { return ''; }
 }
 
+
+/* ── pending sign-in hand-off ──
+ * The picker page (browser) writes, the plugin (Figma) polls. KV is eventually consistent and
+ * caches reads, so the plugin could keep seeing "picking" long after the user picked a sheet.
+ * A Durable Object per sign-in key gives read-your-writes consistency. Falls back to KV if unbound.
+ */
+export class PendingStore {
+  constructor(private state: DurableObjectState) {}
+  async fetch(req: Request): Promise<Response> {
+    const { op, value, ttl } = (await req.json()) as { op: 'get' | 'put' | 'del'; value?: string; ttl?: number };
+    const st = this.state.storage;
+    if (op === 'put') {
+      await st.put('v', { value, exp: Date.now() + (ttl ?? 600) * 1000 });
+      await st.setAlarm(Date.now() + (ttl ?? 600) * 1000);
+      return new Response('ok');
+    }
+    if (op === 'del') { await st.deleteAll(); return new Response('ok'); }
+    const v = (await st.get('v')) as { value: string; exp: number } | undefined;
+    if (!v || v.exp < Date.now()) return new Response('', { status: 404 });
+    return new Response(v.value);
+  }
+  async alarm() { await this.state.storage.deleteAll(); }
+}
+
+function pending(env: Env) {
+  if (!env.PEND) return {
+    get: (k: string) => env.PENDING.get(k),
+    put: (k: string, v: string, ttl = 600) => env.PENDING.put(k, v, { expirationTtl: ttl }),
+    del: (k: string) => env.PENDING.delete(k),
+  };
+  const call = async (k: string, body: object) => env.PEND!.get(env.PEND!.idFromName(k)).fetch('https://pending/', { method: 'POST', body: JSON.stringify(body) });
+  return {
+    get: async (k: string) => { const r = await call(k, { op: 'get' }); return r.ok ? r.text() : null; },
+    put: async (k: string, v: string, ttl = 600) => { await call(k, { op: 'put', value: v, ttl }); },
+    del: async (k: string) => { await call(k, { op: 'del' }); },
+  };
+}
+
 /* ── routes ── */
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -105,34 +145,34 @@ export default {
           if (!KEY_RE.test(key)) return html(messagePage('Sign-in expired', 'This sign-in link is no longer valid.'), 400);
           if (url.searchParams.get('error')) return html(messagePage('Sign-in cancelled', 'No changes were made.', 'info'));
           const t = await tokenRequest(env, { code: url.searchParams.get('code') ?? '', grant_type: 'authorization_code', redirect_uri: redirectUri });
-          await env.PENDING.put(key, JSON.stringify({
+          await pending(env).put(key, JSON.stringify({
             accessToken: t.access_token,
             expiresAt: Date.now() + (t.expires_in - 60) * 1000,
             refresh: t.refresh_token ? await seal(t.refresh_token, env.TOKEN_SECRET) : null,
             email: emailFromIdToken(t.id_token),
             file: null,
-          }), { expirationTtl: 600 });
+          }));
           return html(pickerPage({ key, token: t.access_token, apiKey: env.GOOGLE_API_KEY, appId: env.GOOGLE_APP_ID, hint: /^[\w-]{20,}$/.test(hint) ? hint : '' }));
         }
 
         case '/auth/complete': {
           if (req.method !== 'POST') return json({ error: 'method' }, 405);
-          const { key, id, name } = (await req.json()) as { key: string; id: string; name: string };
-          const raw = KEY_RE.test(key) ? await env.PENDING.get(key) : null;
+          const { key, id, name, mime } = (await req.json()) as { key: string; id: string; name: string; mime?: string };
+          const raw = KEY_RE.test(key) ? await pending(env).get(key) : null;
           if (!raw || !/^[\w-]{20,}$/.test(id)) return json({ error: 'expired' }, 400);
           const entry = JSON.parse(raw);
-          entry.file = { id, name: String(name ?? '').slice(0, 200) };
-          await env.PENDING.put(key, JSON.stringify(entry), { expirationTtl: 600 });
+          entry.file = { id, name: String(name ?? '').slice(0, 200), mime: /^[\w.+/-]{3,100}$/.test(String(mime ?? '')) ? mime : undefined };
+          await pending(env).put(key, JSON.stringify(entry));
           return json({ ok: true });
         }
 
         case '/auth/poll': {
           const key = url.searchParams.get('key') ?? '';
-          const raw = KEY_RE.test(key) ? await env.PENDING.get(key) : null;
+          const raw = KEY_RE.test(key) ? await pending(env).get(key) : null;
           if (!raw) return json({ status: 'pending' });
           const entry = JSON.parse(raw);
           if (!entry.file) return json({ status: 'picking' });
-          await env.PENDING.delete(key); // one-time
+          await pending(env).del(key); // one-time
           return json({ status: 'done', ...entry });
         }
 

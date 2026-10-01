@@ -5,10 +5,10 @@ import { collectSame, collectText, getFill, getKey, issue, linkedKeys, registerK
 import { failTag, isOverflowing, setText } from './text';
 import { makeMatcher } from '../shared/match';
 
-interface SyncArgs { table: Table; mapping: Mapping; lang: string; scope: Scope; pro: boolean; strip?: boolean; autoLink?: boolean; rename?: boolean; same?: SameRef; ids?: string[] }
+interface SyncArgs { table: Table; mapping: Mapping; lang: string; scope: Scope; pro: boolean; strip?: boolean; autoLink?: boolean; rename?: boolean; same?: SameRef; ids?: string[]; onProgress?: (done: number, total: number) => void }
 
 /** Updates every linked layer in scope: key-linked layers get `lang`, fill-linked layers get their cell. */
-export async function syncScope({ table, mapping, lang, scope, pro, strip, autoLink, rename, same, ids }: SyncArgs): Promise<Report> {
+export async function syncScope({ table, mapping, lang, scope, pro, strip, autoLink, rename, same, ids, onProgress }: SyncArgs): Promise<Report> {
   const report = emptyReport();
   report.overflowChecked = true;
   const { dict } = buildDict(table, mapping);
@@ -42,10 +42,13 @@ export async function syncScope({ table, mapping, lang, scope, pro, strip, autoL
     nodes = await collectText(scope === 'same' ? 'selection' : scope);
   }
   const linked: { n: TextNode; key: string; fill: ReturnType<typeof getFill> }[] = [];
+  /** Layers this run links, with their previous key: undone if their text can't be changed. */
+  const newly = new Map<string, string>();
   // Auto-link only where the user pointed: the selection, or texts identical to the selected one
   const match = autoLink && scope === 'selection' && !same ? makeMatcher(dict, strip !== false) : null;
   for (const n of sameUnlinked) {
     if (!known.has(same!.key) && usable && usable.size >= FREE.maxKeys) { report.limited++; continue; }
+    newly.set(n.id, n.getSharedPluginData('sheetlingo', 'key'));
     setData(n, 'key', same!.key);
     if (rename) { try { n.name = '#' + same!.key; } catch (_) { /* instance sublayer */ } }
     report.linkedNew++;
@@ -61,6 +64,7 @@ export async function syncScope({ table, mapping, lang, scope, pro, strip, autoL
     if (m.kind === 'none') { report.noMatch.push(issue(n)); continue; }
     if (m.kind === 'many') { report.ambiguous.push(issue(n, m.keys.slice(0, 3).join(' / '))); continue; }
     if (!known.has(m.key) && usable && usable.size >= FREE.maxKeys) { report.limited++; continue; }
+    newly.set(n.id, '');
     setData(n, 'key', m.key);
     setData(n, 'fill', '');
     if (rename) { try { n.name = '#' + m.key; } catch (_) { /* instance sublayer */ } }
@@ -69,7 +73,10 @@ export async function syncScope({ table, mapping, lang, scope, pro, strip, autoL
   }
   report.total = linked.length;
 
+  let done = 0;
   for (const { n, key, fill } of linked) {
+    // Report progress and let Figma breathe on big runs (keeps the UI responsive)
+    if (onProgress && done++ % 40 === 0) { onProgress(done - 1, linked.length); await new Promise((r) => setTimeout(r, 0)); }
     let value: string | undefined;
     if (fill) {
       const ci = colIndex(fill.c);
@@ -96,7 +103,16 @@ export async function syncScope({ table, mapping, lang, scope, pro, strip, autoL
     const r = await setText(n, strip ? stripTags(value) : value);
     if (r === 'ok') report.updated++;
     else if (r === 'same') report.unchanged++;
-    else report.failed.push(issue(n, key || undefined, failTag(r)));
+    else {
+      report.failed.push(issue(n, key || undefined, failTag(r)));
+      // Couldn't rewrite it (missing font / locked): don't leave a half-done link behind
+      if (newly.has(n.id)) {
+        const prev = newly.get(n.id)!;
+        setData(n, 'key', prev); setKeyBadge(n, prev);
+        if (!prev) setData(n, 'lang', '');
+        report.linkedNew = Math.max(0, report.linkedNew - 1);
+      }
+    }
     if ((r === 'ok' || r === 'same') && isOverflowing(n)) report.overflow.push(issue(n, key || undefined));
   }
   if (fresh.length) registerKeys(fresh);

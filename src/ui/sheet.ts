@@ -135,12 +135,15 @@ export function tableHash(t: Table): string {
 }
 
 export const SAMPLE_CSV = [
-  'key,en,ko,ja,es',
-  'home.title,Welcome back,다시 오신 걸 환영해요,おかえりなさい,Bienvenido de nuevo',
-  'home.subtitle,Manage every word in one sheet,모든 문구를 시트 하나로 관리하세요,すべての文言をひとつのシートで,Gestiona cada palabra en una hoja',
-  'home.cta,Get started,시작하기,はじめる,Empezar',
-  'nickname.error_taken,This nickname is already taken.,이미 사용 중인 닉네임이에요.,このニックネームは使用されています。,Este apodo ya está en uso.',
-  'nickname.error_forbidden,This nickname is not allowed.,사용할 수 없는 닉네임이에요.,このニックネームは使用できません。,Este apodo no está permitido.',
-  'profile.gender_label,Gender,성별,性別,Género',
-  'common.confirm,Confirm,확인,確認,Confirmar',
+  'key,en,ko,es,pt',
+  'common.button.confirm,Confirm,확인,Confirmar,Confirmar',
+  'common.button.cancel,Cancel,취소,Cancelar,Cancelar',
+  'common.button.retry,Try again,다시 시도,Intentar de nuevo,Tentar novamente',
+  'login.title,Welcome back,다시 오신 걸 환영해요,Bienvenido de nuevo,Bem-vindo de volta',
+  'login.error.password,Incorrect password. Please try again.,비밀번호가 올바르지 않아요. 다시 입력해 주세요.,Contraseña incorrecta. Inténtalo de nuevo.,Senha incorreta. Tente novamente.',
+  'shop.item.count,{count} items left,{count}개 남음,Quedan {count} artículos,Restam {count} itens',
+  'shop.purchase.success,Purchase complete!,구매가 완료됐어요!,¡Compra completada!,Compra concluída!',
+  "star.expire.notice,Stars expire automatically after their expiration date. We'll notify you one day before they expire.,스타는 유효기간이 지나면 자동으로 소멸돼요. 소멸 하루 전에 알려드릴게요.,Las estrellas vencen automáticamente tras su fecha de expiración. Te avisaremos un día antes.,As estrelas expiram automaticamente após a data de vencimento. Avisaremos você um dia antes.",
+  'guild.war.start,Guild war starts in {minutes} minutes,{minutes}분 후 길드전이 시작돼요,La guerra de gremios empieza en {minutes} minutos,A guerra de guildas começa em {minutes} minutos',
+  'settings.language,"Language, region","언어, 지역","Idioma, región","Idioma, região"',
 ].join('\n');

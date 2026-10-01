@@ -19,11 +19,17 @@ export function reconcile(n: TextNode): string | null {
   const mine = pluginWrites.get(n.id);
   if (mine !== undefined) { if (mine === n.characters) return null; pluginWrites.delete(n.id); }
   const key = getKey(n);
-  const entry = key ? dict[key] : undefined;
-  if (!key || !entry) return null;
+  if (!key || !n.getSharedPluginData('sheetlingo', 'key')) return null;
   const now = normText(n.characters);
-  const matches = Object.values(entry).some((v) => v && (normText(stripTags(v)) === now || normText(v) === now));
-  if (matches) return null;
+  const entry = dict[key];
+  const matchesSheet = !!entry && Object.values(entry).some((v) => v && (normText(stripTags(v)) === now || normText(v) === now));
+  const stamped = n.getSharedPluginData('sheetlingo', 'txt');
+  // Edited by hand = differs from what the plugin last wrote. Older links (no stamp) fall back to the sheet check.
+  const edited = stamped ? n.characters !== stamped : !!entry && !matchesSheet;
+  if (!edited || matchesSheet) {
+    if (matchesSheet && stamped !== n.characters) { try { n.setSharedPluginData('sheetlingo', 'txt', n.characters); } catch (_) { /* ignore */ } }
+    return null;
+  }
   setData(n, 'key', '');
   setData(n, 'lang', '');
   setKeyBadge(n, '');
@@ -61,6 +67,10 @@ export function watchEdits(enabled: () => boolean, onUnlinked: (name: string, ke
     seen = new Map(t.map((n) => [n.id, n.characters]));
     if (changed.length) check(changed);
   }, 400);
+  // Edits made while the plugin was closed: the stamp tells them apart from sheet updates not applied yet.
+  // Check every selected linked text: with a stamp it compares to what the plugin wrote, without one to the sheet.
+  figma.on('selectionchange', () => check(selectedTexts()));
+  setTimeout(() => check(selectedTexts()), 300);
   let page = figma.currentPage;
   page.on('nodechange', handler);
   figma.on('currentpagechange', () => {
