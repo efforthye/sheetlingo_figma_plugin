@@ -286,8 +286,6 @@ mark { background: rgba(255, 196, 0, 0.35); color: inherit; border-radius: 2px; 
 
 /* live indicator + mini bar */
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: none; }
-.live-dot.on { background: var(--brand); box-shadow: 0 0 0 0 rgba(15,157,107,.6); animation: pulse 2s infinite; }
-@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(15,157,107,.55); } 70% { box-shadow: 0 0 0 6px rgba(15,157,107,0); } 100% { box-shadow: 0 0 0 0 rgba(15,157,107,0); } }
 .minibar { height: 100%; display: flex; align-items: center; gap: 8px; padding: 0 6px 0 12px; }
 .mini-text { min-width: 0; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mini-text b { font-size: 11.5px; }
@@ -304,13 +302,38 @@ mark { background: rgba(255, 196, 0, 0.35); color: inherit; border-radius: 2px; 
 .nav-cur .tag.new { color: var(--warn); }
 .review-nav { align-items: stretch; gap: 6px; }
 .seltext.pinned { box-shadow: inset 2px 0 0 var(--brand); }
-.live-dot.blink { background: #2ee59d; animation: blink 0.5s ease-in-out 3; }
-@keyframes blink { 0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(46,229,157,.7); } 50% { opacity: .35; transform: scale(1.5); box-shadow: 0 0 0 5px rgba(46,229,157,0); } }
 .usage-btn { margin-left: auto; height: 20px; padding: 0 6px; font-size: 10px; }
 .basechip { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 8px; border-radius: 6px; background: var(--bg2); }
 .basetext { font-weight: 600; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.live-dot.ok { background: var(--brand); }
 .target .will { color: var(--brand); }
 .script-guide summary { cursor: pointer; font-weight: 600; font-size: 12px; }
 .script-guide .steps li { margin: 4px 0; }
 .script-guide .btn.sm { display: inline-flex; gap: 4px; align-items: center; vertical-align: middle; }
+.srcbar .src-refresh { margin-left: auto; }
+.srcbar .src-refresh + .btn { margin-left: 0; }
+.icon-btn.on { background: var(--bg2); color: var(--text); }
+.app { position: relative; }
+.pop-backdrop { position: absolute; inset: 0; z-index: 40; }
+.infobox { position: absolute; top: 46px; right: 8px; width: min(290px, calc(100% - 16px)); z-index: 41; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--bg); box-shadow: 0 8px 28px rgba(0,0,0,.18), 0 1px 3px rgba(0,0,0,.08); font-size: 12px; animation: pop-in .12s ease-out; transform-origin: top right; }
+.infobox::before { content: ''; position: absolute; top: -6px; right: 78px; width: 10px; height: 10px; background: var(--bg); border-left: 1px solid var(--border); border-top: 1px solid var(--border); transform: rotate(45deg); }
+@keyframes pop-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+.infobox p { margin: 4px 0 6px; color: var(--text); }
+.infobox ul { margin: 0; padding-left: 16px; color: var(--muted); }
+.infobox li { margin: 3px 0; }
+
+/* header actions: plan badge | info · settings · minimize, one even row */
+.hd .badge { height: 22px; display: inline-flex; align-items: center; padding: 0 9px; font-size: 10.5px; }
+.hd .badge.gauge { padding-bottom: 0; }
+.hd-actions { display: flex; align-items: center; gap: 2px; }
+.hd-div { width: 1px; height: 16px; background: var(--border); margin: 0 6px 0 4px; }
+.hd-actions .icon-btn { width: 28px; height: 28px; }
+
+/* status dot: green while connected, gray only when the sheet can't be reached.
+   All motion stays inside the dot (color/opacity only) with soft easing. */
+.live-dot.ok { background: var(--brand); transition: background-color .6s ease; }
+.live-dot.down { background: var(--faint); }
+.live-dot.live { animation: dot-breathe 3.2s cubic-bezier(.45,0,.55,1) infinite; }
+.live-dot.blink { animation: dot-flash 1.6s cubic-bezier(.45,0,.55,1) 1; }
+@keyframes dot-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+@keyframes dot-flash { 0% { background: var(--brand); } 25% { background: #7af0c1; } 50% { background: var(--brand); } 75% { background: #7af0c1; } 100% { background: var(--brand); } }

@@ -1085,7 +1085,7 @@ export function PlanSheet({ t, plan, reason, usage, onClose }: { t: T; plan: Pla
             </div>
           ))}
         </div>
-        <span className="small muted">{t('allFeatures')}</span>
+        <span className="small muted">{t('allFeatures')} {t('planKeepNote', { max: FREE.maxKeys })}</span>
         {pro && (
           <details className="card soft">
             <summary>{t('manageSub')}</summary>

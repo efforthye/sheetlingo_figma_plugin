@@ -2,6 +2,17 @@ import type { PlanInfo, Tier } from '../shared/types';
 
 let devTier: Tier | null = null;
 let localFirstRun = 0;
+let wasPro = false;
+
+/** Remembers that Pro was active once, so the UI can say "your Pro ended" instead of "limit exceeded". */
+export async function loadWasPro() {
+  wasPro = !!(await figma.clientStorage.getAsync('wasPro'));
+}
+function markPro() {
+  if (wasPro) return;
+  wasPro = true;
+  figma.clientStorage.setAsync('wasPro', true).catch(() => {});
+}
 
 /** Fallback trial clock when figma.payments is unavailable (e.g. dev build without payments). */
 export async function loadLocalTrial() {
@@ -27,11 +38,14 @@ function payments(): PaymentsAPI | null {
 }
 
 export function getPlan(): PlanInfo {
-  if (__DEV__ && devTier) return { tier: devTier, trialDaysLeft: devTier === 'trial' ? 7 : 0 };
+  if (__DEV__ && devTier) {
+    if (devTier !== 'free') markPro();
+    return { tier: devTier, trialDaysLeft: devTier === 'trial' ? 7 : 0, wasPro };
+  }
   const p = payments();
-  // No time-based trial: Free is limited by usage (linked keys), Pro = paid
-  if (p && p.status.type === 'PAID') return { tier: 'pro', trialDaysLeft: 0 };
-  return { tier: 'free', trialDaysLeft: 0 };
+  // Free is limited by usage (linked keys). Pro = an active Figma subscription, including Figma's own trial.
+  if (p && p.status.type === 'PAID') { markPro(); return { tier: 'pro', trialDaysLeft: 0, wasPro: true }; }
+  return { tier: 'free', trialDaysLeft: 0, wasPro };
 }
 
 export const isPro = () => getPlan().tier !== 'free';

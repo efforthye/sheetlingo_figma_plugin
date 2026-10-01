@@ -249,6 +249,18 @@ const en = {
   script4: 'Copy the Web app URL (…/exec) and paste it below.',
   scriptNote: 'The sheet itself stays private; only someone with that URL can read the values. Company accounts: if “Anyone” isn’t offered, your admin blocks it, so use Paste or a personal sheet.',
   copyCode: 'Copy code',
+  aboutTab: 'What is this tab?',
+  infoSync: 'Link texts to sheet keys, then switch linked texts to another language.',
+  infoSyncList: 'Select a text and pick its key. Identical texts in the frame get linked too.|Choose a language and where to apply it: selection, this page or all pages.|Sheet changed? Press refresh in the bar above to re-apply.',
+  infoFill: 'Put sheet data straight into layers, without keys. Good for lists, tables and cards with real content.',
+  infoFillList: 'Text layers: pick a column. Values go in from top to bottom, left to right.|Cards: one card gets one row. Layers named like a column get that column.|Choose the start row to continue where you left off.',
+  infoKeys: 'All keys in the sheet, and tools for the whole page.',
+  infoKeysList: 'Click a key to link the selected texts to it.|Auto-link: link every text on the page whose wording matches the sheet.|Extract: collect the page texts as key,language rows to paste into your sheet.',
+  endedTitle: 'Your Pro plan has ended',
+  upEnded: 'This file has {n} linked keys and Free covers {max}. Applying languages, linking and fill are paused until you renew Pro or unlink keys down to {max}.',
+  lockKeep: 'Nothing was deleted: every link and every text in your design stays exactly as it is. Export and unlinking still work, and other files with {max} keys or fewer keep working on Free.',
+  planKeepNote: 'If Pro ends, your links are kept. Files over {max} keys pause until you renew.',
+  syncDown: 'Can’t reach the sheet right now. Sheetlingo will try again.',
 };
 
 export default en;

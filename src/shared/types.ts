@@ -65,6 +65,8 @@ export const DEFAULT_CONFIG: DocConfig = { renameOnBind: true, autoSync: false, 
 export interface PlanInfo {
   tier: Tier;
   trialDaysLeft: number;
+  /** This user had Pro (paid or Figma trial) before on this machine. Used to explain a lock after Pro ends. */
+  wasPro?: boolean;
 }
 
 export interface SelectionInfo {

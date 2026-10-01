@@ -14,7 +14,7 @@ export const FREE = {
 };
 
 /** Display only — the real price is set in Figma's publish screen. Keep these in sync. */
-export const PRICE = { monthly: '$3.99', yearly: '$36' };
+export const PRICE = { monthly: '$4', yearly: '$36' };
 
 /** Support contact (listing / help). */
 export const CONTACT_EMAIL = 'efforthye@gmail.com';

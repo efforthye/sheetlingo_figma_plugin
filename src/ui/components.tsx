@@ -19,6 +19,7 @@ const paths: Record<string, string> = {
   gear: 'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2zM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
   back: 'M10 3.5 5.5 8l4.5 4.5',
   x: 'M4 4l8 8M12 4l-8 8',
+  info: 'M8 14.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM8 7.2v4M8 4.9v.01',
   minimize: 'M2.5 9.5h4v4M13.5 6.5h-4v-4M2.5 13.5 6.5 9.5M13.5 2.5 9.5 6.5',
   expand: 'M9.5 3.5h3v3M6.5 12.5h-3v-3M12.5 3.5 9 7M3.5 12.5 7 9',
   lock: 'M5 7V5.5a3 3 0 0 1 6 0V7M4 7h8v6H4z',
@@ -28,7 +29,7 @@ const paths: Record<string, string> = {
 };
 export const Icon = ({ name, size = 16, className }: { name: keyof typeof paths | string; size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox={name === 'gear' ? '0 0 24 24' : '0 0 16 16'} fill="none" stroke="currentColor"
-    strokeWidth={name === 'gear' ? 1.8 : 1.4} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+    strokeWidth={name === 'gear' ? 2.1 : 1.4} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
     <path d={paths[name]} />
   </svg>
 );

@@ -2,7 +2,7 @@ import type { CodeToUi, Scope, UiToCode } from '../shared/types';
 import { autoLink, bindSelection, unbindSelection } from './bind';
 import { exportLayers } from './export';
 import { fillCards, fillText } from './fill';
-import { devSetTier, getPlan, isPro, loadDevTier, loadLocalTrial, upgrade } from './payments';
+import { devSetTier, getPlan, isPro, loadDevTier, loadLocalTrial, loadWasPro, upgrade } from './payments';
 import { collectSame, collectText, getFill, getKey, linkedKeys, readingOrder, recountKeys, whereOf } from './nodes';
 import { FREE } from '../shared/constants';
 import { buildDict } from '../shared/dict';
@@ -33,7 +33,8 @@ figma.on('currentpagechange', postSelection);
 const effectiveScope = (s: Scope): Scope => s;
 
 /** Free plan hard stop: a file with more linked keys than the Free limit is locked until upgrade. */
-const LOCKED = new Set(['sync', 'fill-text', 'fill-cards', 'bind', 'auto-link', 'export']);
+// Reading (export) and cleaning up (unbind, recount) stay open so nobody is stuck with their own data.
+const LOCKED = new Set(['sync', 'fill-text', 'fill-cards', 'bind', 'auto-link']);
 const overLimit = () => !isPro() && linkedKeys().length > FREE.maxKeys;
 
 figma.ui.onmessage = async (msg: UiToCode) => {
@@ -46,7 +47,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
     }
     switch (msg.type) {
       case 'ui-ready': {
-        const [table, locale, auth] = await Promise.all([loadTable(), figma.clientStorage.getAsync('uiLocale'), figma.clientStorage.getAsync('googleAuth'), loadDevTier(), loadLocalTrial()]);
+        const [table, locale, auth] = await Promise.all([loadTable(), figma.clientStorage.getAsync('uiLocale'), figma.clientStorage.getAsync('googleAuth'), loadDevTier(), loadLocalTrial(), loadWasPro()]);
         setWatchDict(table, loadConfig().mapping);
         post({ type: 'init', config: loadConfig(), plan: getPlan(), selection: getSelectionInfo(), table, command, locale: locale ?? null, auth: auth ?? null });
         if (command !== 'resync') postUsage();

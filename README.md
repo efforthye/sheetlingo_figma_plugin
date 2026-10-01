@@ -105,7 +105,7 @@ Editing a linked text by hand (so it no longer matches its key) unlinks it autom
 |---|---|---|
 | Linked keys per file | up to 100 | Unlimited |
 | Every feature | ✓ | ✓ |
-| Price | $0 | $3.99 / month or $36 / year |
+| Price | $0 | $4 / month or $36 / year (25% off) |
 
 Payments use Figma's native checkout. A Free file over 100 linked keys is locked (links are kept) until upgrade or unlinking.
 

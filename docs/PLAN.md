@@ -35,7 +35,7 @@ Figma native payments allow **one price per plugin**, so pricing is usage-based 
 | Plan | Linked keys per file | Price |
 |---|---|---|
 | Free | up to 100 | $0 |
-| Pro | Unlimited | $3.99 / month or $36 / year (Figma payments, 15% fee) |
+| Pro | Unlimited | $4 / month or $36 / year (25% off) (Figma payments, 15% fee) |
 
 - Every feature is available on every plan; plans differ only by linked-key count. No time-based trial.
 - "Linked keys" = distinct keys linked in the file (registry stored in the document).

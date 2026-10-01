@@ -156,7 +156,7 @@ With only non-sensitive scopes (`drive.file`, `openid`, `email`) no review is ne
 
 Until the brand is verified, Google's sign-in screen shows the domain (`efforthye.workers.dev`) instead of the app name.
 
-The Worker already serves the pages Google asks for:
+The Worker already serves the pages Google asks for (`server/src/pages.ts`, which also holds the sign-in flow screens):
 
 | Page | URL |
 |---|---|

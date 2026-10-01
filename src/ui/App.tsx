@@ -26,6 +26,9 @@ export function App() {
   const [report, setReport] = useState<{ source: ReportSource; report: Report } | null>(null);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [info, setInfo] = useState(false);
+  /** Last fetch of a Google source failed (offline, signed out, access removed). */
+  const [linkDown, setLinkDown] = useState(false);
   const [showPlan, setShowPlan] = useState(false);
   const [exported, setExported] = useState<{ csv: string; rows: number; generated: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -100,6 +103,7 @@ export function App() {
       try {
         const fresh = await loadSource();
         setLastCheck(Date.now());
+        setLinkDown(false);
         if (fresh) {
           const changed = !tbl || tableHash(fresh) !== tableHash(tbl);
           tbl = fresh;
@@ -112,6 +116,7 @@ export function App() {
           if (silent && !changed) return;
         }
       } catch (e) {
+        setLinkDown(true);
         if (!silent) flash(errorText(e, st.current.t));
         if (st.current.command === 'resync') { send({ type: 'notify', message: errorText(e, st.current.t) }); send({ type: 'close' }); }
         return;
@@ -310,11 +315,14 @@ export function App() {
 
   const lastSync = Math.max(lastCheck, lastApplied);
   const blink = Date.now() - lastSync < 2500;
+  // Green whenever the sheet is connected; gray only when it can't be reached. Live sync breathes gently.
+  const dotCls = 'live-dot' + (linkDown ? ' down' : ' ok') + (liveOn && !linkDown ? ' live' : '') + (blink && !linkDown ? ' blink' : '');
+  const dotTitle = linkDown ? t('syncDown') : liveOn ? t('liveOn') : t('liveOff');
 
   if (ready && mini) {
     return (
       <div className="minibar">
-        <span className={'live-dot' + (liveOn ? ' on' : ' ok') + (blink ? ' blink' : '')} key={lastSync} />
+        <span className={dotCls} key={lastSync} title={dotTitle} />
         <span className="grow mini-text">
           {lastSync ? t('syncedAgo', { t: ago(lastSync) }) : liveCapable ? t('notSynced') : t('manualSync')}
         </span>
@@ -360,31 +368,45 @@ export function App() {
         <button className={'badge gauge ' + plan.tier + (!pro && usage >= FREE.maxKeys ? ' full' : '')} onClick={() => upgrade()} title={t('usageKeys', { n: usage, max: FREE.maxKeys })}>
           {pro ? tier : <>{tier} · {usage}/{FREE.maxKeys}<i style={{ width: Math.min(100, (usage / FREE.maxKeys) * 100) + '%' }} /></>}
         </button>
-        {connected && (
-          <button className="icon-btn" title={t('resync')} disabled={refreshing || busy} onClick={() => refresh(true)}>
-            <Icon name="refresh" className={refreshing ? 'spin' : ''} />
-          </button>
-        )}
         {connected && view !== 'source' && (
-          <button className="icon-btn" title={t('minimize')} onClick={goMini}><Icon name="minimize" /></button>
-        )}
-        {connected && view !== 'source' && (
-          <button className="icon-btn" title={t('settings')} onClick={() => setView('source')}><Icon name="gear" /></button>
+          <div className="hd-actions">
+            <span className="hd-div" />
+            <button className={'icon-btn' + (info ? ' on' : '')} title={t('aboutTab')} onClick={() => setInfo((v) => !v)} aria-expanded={info}><Icon name="info" size={16} /></button>
+            <button className="icon-btn" title={t('settings')} onClick={() => setView('source')}><Icon name="gear" size={16} /></button>
+            <button className="icon-btn" title={t('minimize')} onClick={goMini}><Icon name="minimize" size={16} /></button>
+          </div>
         )}
       </header>
+      {connected && view !== 'source' && info && (
+        <>
+          <div className="pop-backdrop" onClick={() => setInfo(false)} />
+          <div className="infobox" role="dialog">
+          <div className="row between"><b>{t(view === 'sync' ? 'tabSync' : view === 'fill' ? 'tabFill' : 'tabKeys')}</b>
+            <button className="icon-btn sm" title={t('close')} onClick={() => setInfo(false)}><Icon name="x" size={12} /></button></div>
+          <p>{t(view === 'sync' ? 'infoSync' : view === 'fill' ? 'infoFill' : 'infoKeys')}</p>
+          <ul>{t(view === 'sync' ? 'infoSyncList' : view === 'fill' ? 'infoFillList' : 'infoKeysList').split('|').map((x) => <li key={x}>{x}</li>)}</ul>
+        </div>
+        </>
+      )}
 
       {connected && view !== 'source' && (
         <div className="srcbar">
-          <span className={'live-dot' + (liveOn ? ' on' : '') + (blink ? ' blink' : '')} key={lastSync} title={liveOn ? t('liveOn') : t('liveOff')} /><span className="name" title={config.source!.label}>{config.source!.label}</span>
+          <span className={dotCls} key={lastSync} title={dotTitle} /><span className="name" title={config.source!.label}>{config.source!.label}</span>
           <span className="meta">· {t('rowsCount', { n: table!.rows.length })} · {liveOn && lastSync ? t('syncedAgo', { t: ago(lastSync) }) : t('sourceUpdated', { time })}</span>
+          <button className="icon-btn sm src-refresh" title={t('resync')} disabled={refreshing || busy} onClick={() => refresh(true)}>
+            <Icon name="refresh" size={14} className={refreshing ? 'spin' : ''} />
+          </button>
           <button className="btn ghost sm" onClick={() => setView('source')}>{t('changeSource')}</button>
         </div>
       )}
 
+
+
       {connected && view !== 'source' && !pro && usage > FREE.maxKeys && (
         <div className="lockbar">
-          <b>{t('overTitle')}</b>
-          <span>{t('upOver', { n: usage, max: FREE.maxKeys })}</span>
+          <b>{t(plan.wasPro ? 'endedTitle' : 'overTitle')}</b>
+          <span>{t(plan.wasPro ? 'upEnded' : 'upOver', { n: usage, max: FREE.maxKeys })}</span>
+          <span className="small">{t('lockKeep')}</span>
           <div className="row">
             <button className="btn sm pro" onClick={() => upgrade('upOver')}>{t('upgrade')}</button>
             <button className="btn sm ghost" onClick={() => send({ type: 'recount-keys' })} title={t('recountHint')}>{t('recount')}</button>
