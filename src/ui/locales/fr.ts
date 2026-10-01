@@ -257,6 +257,7 @@ const fr: Messages = {
   lockKeep: 'Nothing was deleted: every link and every text in your design stays exactly as it is. Export and unlinking still work, and other files with {max} keys or fewer keep working on Free.',
   planKeepNote: 'If Pro ends, your links are kept. Files over {max} keys pause until you renew.',
   syncDown: 'Can’t reach the sheet right now. Sheetlingo will try again.',
+  signInAgain: 'Sign-in didn’t finish. Press the button above to try again.',
 };
 
 export default fr;

@@ -30,21 +30,21 @@
 
 **Name**
 ```
-Sheetlingo: Google Sheets Localization & Text Sync
+Sheetlingo: Google Sheets & CSV Localization & Text Sync
 ```
 
 **Tagline**
 ```
-Link Figma text to Google Sheets keys and switch languages in one click.
+Link Figma text to keys from Google Sheets, CSV or Excel and switch languages in one click.
 ```
 
 **Category**: Design tools (or Content / Localization if offered)
 
-**Tags**: google sheets, localization, translation, i18n, multilingual, csv, spreadsheet, sync, copy, content
+**Tags**: google sheets, csv, excel, localization, translation, i18n, multilingual, spreadsheet, sync, copy, content
 
 **Description**
 ```
-Sheetlingo keeps every word of your design in a spreadsheet. Link text layers to keys, switch the whole design to another language in one click, and pick up sheet edits automatically. No more copy and paste.
+Sheetlingo keeps every word of your design in a spreadsheet: Google Sheets, a CSV file, or cells pasted from Excel or Numbers. Link text layers to keys, switch the whole design to another language in one click, and pick up sheet edits automatically. No more copy and paste.
 
 HOW IT WORKS
 1. Connect a Google Sheet, a CSV file or pasted cells. One column for keys, one column per language.
@@ -64,12 +64,13 @@ STAY IN SYNC
 
 MORE
 • Fill: put spreadsheet rows into text layers or cards in reading order
-• Keys: every key in the file, where it is used, and which are missing in the sheet
+• Keys: browse every key in the sheet, link the selected texts with one click, or auto-link a whole page
+• After each apply, a report lists missing keys, fallbacks and missing fonts, and jumps to the layer
 • Export the texts of an existing design to CSV to start your sheet
 • Plugin UI in English, 한국어, 日本語, 简体中文, Español, Français, Deutsch
 
 PRIVATE AND COMPANY SHEETS
-Sign in with Google and pick the sheet. Sheetlingo uses the drive.file scope, so it can open only the file you choose. Public links, CSV and paste work without signing in.
+Sign in with Google and pick the sheet. Sheetlingo uses the drive.file scope, so it can open only the file you choose. Public links, CSV files and pasted cells work without signing in or any account.
 
 PRICING
 Free: up to 100 linked keys per file, every feature included.

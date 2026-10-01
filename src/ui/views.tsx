@@ -106,22 +106,29 @@ export function SourceView(p: {
     if (!tab) throw new SheetError('empty');
     await loadTab(a, file, tab);
   };
+  /** Sign-in problems are shown inside the Google card, not in the link section below. */
+  const [authMsg, setAuthMsg] = useState<{ text: string; err: boolean } | null>(null);
+  const authFail = (e: unknown) => {
+    setStatus('idle'); setErr('');
+    if (e instanceof GoogleError && e.code === 'cancelled') setAuthMsg({ text: t('signInAgain'), err: false });
+    else setAuthMsg({ text: errorText(e, t), err: true });
+  };
   const pick = async (hint?: string, gid?: number) => {
     signal.current = { cancelled: false };
-    setSigning(true); setStatus('idle'); setErr('');
+    setSigning(true); setStatus('idle'); setErr(''); setAuthMsg(null);
     try {
       const { auth, file } = await signInAndPick({ consent: !p.auth?.refresh, fileHint: hint, signal: signal.current });
       const merged: GoogleAuth = { ...auth, refresh: auth.refresh ?? p.auth?.refresh ?? null };
       p.onAuth(merged);
       setSigning(false);
       await loadFile(merged, file.id, file.id === hint ? gid : undefined);
-    } catch (e) { setSigning(false); fail(e); }
+    } catch (e) { setSigning(false); authFail(e); }
   };
   const changeTab = async (id: number) => {
     const tab = tabs?.find((x) => x.id === id);
     if (!tab || !apiFile || !p.auth) return;
-    setStatus('loading');
-    try { await loadTab(await withAuth(p.auth), apiFile, tab); } catch (e) { fail(e); }
+    setStatus('loading'); setAuthMsg(null);
+    try { await loadTab(await withAuth(p.auth), apiFile, tab); } catch (e) { authFail(e); }
   };
   const signOut = async () => { if (p.auth) await revoke(p.auth); p.onAuth(null); };
 
@@ -276,6 +283,7 @@ export function SourceView(p: {
                   <GoogleG />{p.auth ? t('chooseSheet') : t('signInGoogle')}
                 </button>
               )}
+              {authMsg && !signing && <div className={'auth-msg' + (authMsg.err ? ' err' : '')}>{authMsg.text}</div>}
               {scriptTabs && scriptTabs.length > 1 && isScriptUrl(url) && (
                 <div className="field">
                   <label>{t('tab')}</label>

@@ -337,3 +337,5 @@ mark { background: rgba(255, 196, 0, 0.35); color: inherit; border-radius: 2px; 
 .live-dot.blink { animation: dot-flash 1.6s cubic-bezier(.45,0,.55,1) 1; }
 @keyframes dot-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 @keyframes dot-flash { 0% { background: var(--brand); } 25% { background: #7af0c1; } 50% { background: var(--brand); } 75% { background: #7af0c1; } 100% { background: var(--brand); } }
+.auth-msg { font-size: 11.5px; color: var(--muted); text-align: center; }
+.auth-msg.err { color: var(--danger, #d64545); }
