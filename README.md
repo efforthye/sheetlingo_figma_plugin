@@ -95,6 +95,12 @@ If Pro ends, nothing is deleted: links and texts stay, export and unlink keep wo
 
 Each tab also has an **ⓘ** button that explains what it does in two lines.
 
+### 9. Light and dark
+
+<p align="center"><img src="docs/screenshots/03-link.png" width="300" /> <img src="docs/screenshots/10-link-dark.png" width="300" /></p>
+
+Sheetlingo follows Figma's theme automatically (`themeColors`), so it looks at home in light and dark mode, in any of its 7 UI languages.
+
 ---
 
 ## Under the hood

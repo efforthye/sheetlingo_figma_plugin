@@ -98,7 +98,7 @@ Reads the Google Sheet the user connects (public CSV export or Google Sheets API
 |---|---|
 | `docs/assets/icon-128.png` | Icon (128 × 128) |
 | `00-cover.png` | Thumbnail / cover (1920 × 1080) |
-| `01-link.png` … `05-plans.png` | Carousel, in this order |
+| `01-link.png` … `06-dark.png` | Carousel, in this order: 01-link, 02-switch, 03-connect, 04-keys, 06-dark, 05-plans |
 
 ## After launch
 

@@ -3,6 +3,7 @@
 export const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 const CONTACT = 'efforthye@gmail.com';
+const COMMUNITY = 'https://www.figma.com/community/plugin/1686971732936550159/sheetlingo-google-sheets-csv-localization-sync';
 const UPDATED = 'October 1, 2026';
 
 const LOGO_BODY = (id: string) => `<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#18c286"/><stop offset="1" stop-color="#0a7a54"/></linearGradient></defs><rect width="20" height="20" rx="5" fill="url(#${id})"/><rect x="3.2" y="3.2" width="11.8" height="12.6" rx="1.8" fill="#fff"/><path d="M3.2 9.5h11.8M9.1 3.2v12.6" stroke="#0f9d6b" stroke-opacity=".3" stroke-width=".7" fill="none"/><path d="M4.66 8.1H5.35L5.59 7.23H6.69L6.93 8.1H7.64L6.55 4.69H5.75ZM5.73 6.7 5.83 6.32C5.94 5.97 6.03 5.58 6.12 5.21H6.14C6.24 5.57 6.34 5.97 6.44 6.32L6.54 6.7ZM12.79 4.49V8.47H13.37V6.49H13.92V6.02H13.37V4.49ZM10.42 4.91V5.37H11.72C11.62 6.25 11.13 6.88 10.21 7.36L10.53 7.79C11.85 7.12 12.31 6.1 12.31 4.91ZM7.22 11.94 6.7 11.82C6.69 11.88 6.67 11.99 6.66 12.08H6.58C6.37 12.08 6.15 12.11 5.94 12.15L5.97 11.76C6.5 11.74 7.07 11.69 7.5 11.61L7.49 11.11C7.02 11.23 6.55 11.28 6.03 11.3L6.07 11.07C6.09 11 6.11 10.92 6.13 10.84L5.57 10.83C5.58 10.9 5.57 11 5.57 11.08L5.54 11.32H5.37C5.11 11.32 4.73 11.28 4.58 11.26L4.59 11.75C4.79 11.76 5.13 11.78 5.35 11.78H5.49C5.47 11.96 5.46 12.14 5.45 12.32C4.85 12.61 4.39 13.18 4.39 13.74C4.39 14.17 4.66 14.36 4.97 14.36C5.2 14.36 5.43 14.29 5.64 14.19L5.69 14.36L6.19 14.21C6.15 14.11 6.12 14 6.09 13.9C6.42 13.62 6.76 13.17 6.99 12.59C7.29 12.7 7.44 12.93 7.44 13.19C7.44 13.61 7.1 14.03 6.27 14.12L6.56 14.58C7.62 14.42 7.97 13.83 7.97 13.22C7.97 12.72 7.64 12.33 7.14 12.16ZM6.52 12.52C6.37 12.86 6.18 13.12 5.97 13.33C5.94 13.12 5.92 12.89 5.92 12.62V12.61C6.09 12.56 6.29 12.52 6.52 12.52ZM5.53 13.69C5.37 13.78 5.22 13.84 5.1 13.84C4.96 13.84 4.9 13.76 4.9 13.62C4.9 13.38 5.11 13.05 5.44 12.83C5.44 13.13 5.48 13.43 5.53 13.69Z" fill="#0a7a54"/><g transform="translate(10.6 10.2) scale(.86)"><path d="M5 2.6c-.9-.6-2.2-.7-3.1 0C.8 3.5.6 5.2 1.1 6.6c.5 1.4 1.5 2.8 2.6 2.8.5 0 .8-.25 1.3-.25s.8.25 1.3.25c1.1 0 2.1-1.4 2.6-2.8.5-1.4.3-3.1-.8-4-.9-.7-2.2-.6-3.1 0z" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><path d="M5 2.6c-.9-.6-2.2-.7-3.1 0C.8 3.5.6 5.2 1.1 6.6c.5 1.4 1.5 2.8 2.6 2.8.5 0 .8-.25 1.3-.25s.8.25 1.3.25c1.1 0 2.1-1.4 2.6-2.8.5-1.4.3-3.1-.8-4-.9-.7-2.2-.6-3.1 0z" fill="#ff4d4f"/><path d="M2.2 4.4c.2-.8.8-1.2 1.4-1.3" stroke="#fff" stroke-opacity=".55" stroke-width=".55" stroke-linecap="round" fill="none"/><path d="M5 2.7c0-.8.2-1.4.7-1.9" stroke="#6b3e1e" stroke-width=".6" stroke-linecap="round" fill="none"/><path d="M5.4 1.6c.5-.9 1.5-1.2 2.4-1 -.3.9-1.2 1.4-2.4 1z" fill="#3ccf7f"/></g>`;
@@ -170,12 +171,12 @@ footer nav a{margin:0 0 0 18px;font-size:13px}
 .doc h2{font-size:18px;margin:36px 0 10px;letter-spacing:-.02em}
 .doc p,.doc li{color:var(--ink2)}.doc ul{padding-left:20px}.doc li{margin:6px 0}.doc b{color:var(--ink)}
 .box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px 22px 6px}
-@media (max-width:860px){.hero{grid-template-columns:1fr;padding:56px 0 130px;gap:48px}.hero h1{font-size:36px}.features{grid-template-columns:1fr;margin-top:96px}.frame{right:8px}.trust{grid-template-columns:1fr}nav a{margin-left:14px}header nav a[href^=mailto]{display:none}footer nav{display:flex;flex-wrap:wrap;gap:6px 16px}footer nav a{margin:0}.sheet th:nth-child(4),.sheet td:nth-child(4){display:none}.lead{font-size:16px}.frame{width:200px;right:-6px;bottom:-110px}}
+@media (max-width:860px){.hero{grid-template-columns:1fr;padding:56px 0 130px;gap:48px}.hero h1{font-size:36px}.features{grid-template-columns:1fr;margin-top:96px}.frame{right:8px}.trust{grid-template-columns:1fr}nav a{margin-left:14px}header nav a[href^=mailto],header nav a[target]{display:none}footer nav{display:flex;flex-wrap:wrap;gap:6px 16px}footer nav a{margin:0}.sheet th:nth-child(4),.sheet td:nth-child(4){display:none}.lead{font-size:16px}.frame{width:200px;right:-6px;bottom:-110px}}
 `;
 
 const site = (title: string, main: string, head = '') => shell(title, SITE_CSS, `
 <header><div class="wrap"><a class="home" href="/">${LOGO(26, 'b')}Sheetlingo</a>
-<nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="mailto:${CONTACT}">Contact</a></nav></div></header>
+<nav><a href="${COMMUNITY}" target="_blank" rel="noopener">Figma Community</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="mailto:${CONTACT}">Contact</a></nav></div></header>
 ${main}
 <footer><div class="wrap"><span>© 2026 Sheetlingo</span><nav><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Service</a><a href="mailto:${CONTACT}">${CONTACT}</a></nav></div></footer>`)
   .replace('<title>', head + '<title>');
@@ -194,7 +195,7 @@ export const homePage = (verification?: string) => site('Sheetlingo · Sync Figm
       <span class="eyebrow">${IC.globe.replace(/20/g, '14')}Figma plugin for localization</span>
       <h1>Your copy lives<br>in a sheet.<br><em>Your designs follow.</em></h1>
       <p class="lead">Link Figma text layers to spreadsheet keys, switch every screen to another language in one click, and pick up sheet edits automatically.</p>
-      <div class="cta"><a class="btn primary" href="mailto:${CONTACT}?subject=Sheetlingo">Get early access</a><a class="btn ghost" href="/privacy">How we handle data</a></div>
+      <div class="cta"><a class="btn primary" href="${COMMUNITY}" target="_blank" rel="noopener">Get it on Figma</a><a class="btn ghost" href="/privacy">How we handle data</a></div>
     </div>
     <div class="visual">
       <div class="panel sheet">
