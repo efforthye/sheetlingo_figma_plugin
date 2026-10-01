@@ -14,12 +14,14 @@
   "networkAccess": {
     "allowedDomains": [
       "https://docs.google.com",
+      "https://script.google.com",
       "https://*.googleusercontent.com",
       "https://sheets.googleapis.com",
       "https://www.googleapis.com",
-      "https://cdn.jsdelivr.net"
+      "https://cdn.jsdelivr.net",
+      "https://sheetlingo-auth.efforthye.workers.dev"
     ],
-    "reasoning": "Reads the Google Sheet the user connects (public CSV or Google Sheets API after sign-in) and loads the Pretendard UI font."
+    "reasoning": "Reads the Google Sheet the user connects (public CSV or Google Sheets API after sign-in via the Sheetlingo auth server) and loads the Pretendard UI font."
   },
   "relaunchButtons": [
     {

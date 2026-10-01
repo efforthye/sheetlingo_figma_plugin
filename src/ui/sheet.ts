@@ -6,10 +6,45 @@ export class SheetError extends Error {
   constructor(public code: SheetErrorCode) { super(code); }
 }
 
-export interface SheetRef { id: string; gid: string; published: boolean }
+export interface SheetRef { id: string; gid: string; published: boolean; script?: string }
+
+/** Apps Script web app the user pastes into their own sheet: reads a private sheet without any server or sign-in. */
+export const APPS_SCRIPT = `// Sheetlingo: lets the Figma plugin read this sheet (it stays private)
+function doGet(e) {
+  var p = (e && e.parameter) || {};
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  if (p.tabs) {
+    var list = sheets.map(function (s) { return { id: s.getSheetId(), title: s.getName() }; });
+    return ContentService.createTextOutput(JSON.stringify(list)).setMimeType(ContentService.MimeType.JSON);
+  }
+  var sh = sheets.filter(function (s) { return String(s.getSheetId()) === String(p.gid); })[0] || sheets[0];
+  var rows = sh.getDataRange().getDisplayValues();
+  var csv = rows.map(function (r) {
+    return r.map(function (c) { return /[",\\r\\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(',');
+  }).join('\\n');
+  return ContentService.createTextOutput(csv).setMimeType(ContentService.MimeType.TEXT);
+}
+`;
+
+const SCRIPT_RE = /^https:\/\/script\.google\.com\/(?:a\/macros\/[^/]+|macros)\/s\/([\w-]{20,})\/exec/;
+export const isScriptUrl = (s: string) => SCRIPT_RE.test(s.trim());
+export const scriptUrlWithGid = (s: string, gid: number | string) => {
+  const m = s.trim().match(SCRIPT_RE);
+  return m ? `${m[0]}?gid=${gid}` : s;
+};
+
+/** Tabs of a sheet reached through the Apps Script web app. */
+export async function fetchScriptTabs(ref: SheetRef): Promise<{ id: number; title: string }[]> {
+  const r = await tryFetch(`${ref.script}?tabs=1`);
+  if (!r.ok) throw new SheetError(r.code);
+  try { return JSON.parse(r.text); } catch (_) { throw new SheetError('not-shared'); }
+}
 
 export function parseSheetUrl(input: string): SheetRef | null {
   const s = input.trim();
+  const sm = s.match(SCRIPT_RE);
+  if (sm) return { id: sm[1], gid: (s.match(/[?&]gid=(\d+)/) || [])[1] || '', published: false, script: sm[0] };
   const gid = (s.match(/[#&?]gid=(\d+)/) || [])[1] || '0';
   const pub = s.match(/\/spreadsheets\/d\/e\/([\w-]+)/);
   if (pub) return { id: pub[1], gid, published: true };
@@ -74,7 +109,9 @@ async function tryFetch(url: string): Promise<{ ok: true; text: string } | { ok:
 /** Fetch a Google Sheet tab as CSV. Needs "Anyone with the link · Viewer" (or Publish to web). */
 export async function fetchGoogleSheet(ref: SheetRef): Promise<string[][]> {
   const base = 'https://docs.google.com/spreadsheets/d/';
-  const urls = ref.published
+  const urls = ref.script
+    ? [`${ref.script}${ref.gid ? `?gid=${ref.gid}` : ''}`]
+    : ref.published
     ? [`${base}e/${ref.id}/pub?output=csv&gid=${ref.gid}`]
     : [
         `${base}${ref.id}/export?format=csv&gid=${ref.gid}`,

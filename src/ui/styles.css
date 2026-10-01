@@ -311,3 +311,6 @@ mark { background: rgba(255, 196, 0, 0.35); color: inherit; border-radius: 2px; 
 .basetext { font-weight: 600; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .live-dot.ok { background: var(--brand); }
 .target .will { color: var(--brand); }
+.script-guide summary { cursor: pointer; font-weight: 600; font-size: 12px; }
+.script-guide .steps li { margin: 4px 0; }
+.script-guide .btn.sm { display: inline-flex; gap: 4px; align-items: center; vertical-align: middle; }

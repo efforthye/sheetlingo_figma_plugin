@@ -7,7 +7,7 @@ const cfg = 'src/shared/config.ts';
 fs.writeFileSync(cfg, fs.readFileSync(cfg, 'utf8').replace(/export const AUTH_SERVER = '[^']*';/, `export const AUTH_SERVER = '${url}';`));
 
 const m = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
-const base = ['https://docs.google.com', 'https://*.googleusercontent.com', 'https://sheets.googleapis.com', 'https://www.googleapis.com', 'https://cdn.jsdelivr.net'];
+const base = ['https://docs.google.com', 'https://script.google.com', 'https://*.googleusercontent.com', 'https://sheets.googleapis.com', 'https://www.googleapis.com', 'https://cdn.jsdelivr.net'];
 m.networkAccess = {
   allowedDomains: Array.from(new Set([...base, url])),
   reasoning: 'Reads the Google Sheet the user connects (public CSV or Google Sheets API after sign-in via the Sheetlingo auth server) and loads the Pretendard UI font.',

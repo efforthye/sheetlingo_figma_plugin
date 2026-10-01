@@ -3,7 +3,7 @@
  * Set it with:  node scripts/set-auth-server.mjs https://sheetlingo-auth.<you>.workers.dev
  * (updates this file AND manifest.json networkAccess)
  */
-export const AUTH_SERVER = 'https://sheetlingo-auth.YOUR-SUBDOMAIN.workers.dev';
+export const AUTH_SERVER = 'https://sheetlingo-auth.efforthye.workers.dev';
 
 export const authConfigured = () => !AUTH_SERVER.includes('YOUR-SUBDOMAIN');
 

@@ -237,6 +237,14 @@ const ja: Messages = {
   error: 'エラーが発生しました：{msg}',
   notifyResync: 'Sheetlingo：{n} 個更新 · {m} 個不足',
   notifyConnectFirst: 'Sheetlingo：先にプラグインを開いてシートを接続してください。',
+  scriptDesc: 'シートは非公開のまま、シート内の小さなスクリプトでSheetlingoだけが読めるようにします。無料・ログイン不要・設定は一度だけ。',
+  scriptTitle: '非公開シートを接続（1分）',
+  script1: 'シートで 拡張機能 › Apps Script を開きます。',
+  script2: '中身をすべて消してコードを貼り付け、保存します。',
+  script3: 'デプロイ › 新しいデプロイ › 種類 ウェブアプリ。実行ユーザー: 自分、アクセス: 全員。デプロイして権限を許可します。',
+  script4: 'ウェブアプリのURL（…/exec）をコピーして下に貼り付けます。',
+  scriptNote: 'シート自体は非公開のままで、このURLを知っている人だけが値を読めます。会社アカウントで「全員」が出ない場合は管理者が制限しています。',
+  copyCode: 'コードをコピー',
 };
 
 export default ja;

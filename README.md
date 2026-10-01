@@ -145,7 +145,13 @@ Figma → **Plugins → Development → Import plugin from manifest…** → `ma
 | `npm run build` | Type check + production build |
 | `npm run typecheck` | Type check only |
 
-Private Google Sheets need the small auth server in [`server/`](server/README.md) (Cloudflare Worker).
+Private Google Sheets use the small auth server in [`server/`](server/README.md): a Cloudflare Worker on the free plan, deployed at `https://sheetlingo-auth.efforthye.workers.dev`, with the Google Cloud project `sheetlingo`.
+
+- Users click **Sign in with Google**, pick the sheet in Google's picker, and the plugin reads it with the Sheets API. No link sharing needed.
+- Scope `drive.file`: only the sheets each user picks are readable. Tokens stay on the user's machine.
+- While the Google app is in *Testing*, only listed test users can sign in. Publish the app before selling.
+- [`server/README.md`](server/README.md) has the full deployment record, setup from scratch, deploy checks and troubleshooting.
+
 Full test checklist: [`docs/TESTING.md`](docs/TESTING.md).
 
 ### Troubleshooting

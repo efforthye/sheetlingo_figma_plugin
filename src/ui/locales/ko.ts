@@ -237,6 +237,14 @@ const ko: Messages = {
   error: '오류가 발생했어요: {msg}',
   notifyResync: 'Sheetlingo: {n}개 변경 · {m}개 누락',
   notifyConnectFirst: 'Sheetlingo: 먼저 플러그인을 열어 시트를 연결해 주세요.',
+  scriptDesc: '시트는 비공개 그대로 두고, 시트 안의 작은 스크립트로 Sheetlingo만 읽게 해요. 무료, 로그인 없음, 한 번만 설정하면 돼요.',
+  scriptTitle: '비공개 시트 연결하기 (1분)',
+  script1: '시트에서 확장 프로그램 › Apps Script를 열어요.',
+  script2: '안에 있는 내용을 모두 지우고 코드를 붙여넣은 뒤 저장해요.',
+  script3: '배포 › 새 배포 › 유형 웹 앱. 실행 계정: 나, 액세스 권한: 모든 사용자. 배포하고 권한을 허용해요.',
+  script4: '웹 앱 URL(…/exec)을 복사해서 아래에 붙여넣어요.',
+  scriptNote: '시트 자체는 비공개로 유지되고, 이 URL을 가진 사람만 값을 읽을 수 있어요. 회사 계정에서 "모든 사용자"가 안 보이면 관리자가 막아둔 것이니 붙여넣기나 개인 시트를 쓰세요.',
+  copyCode: '코드 복사',
 };
 
 export default ko;

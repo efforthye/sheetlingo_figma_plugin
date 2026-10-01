@@ -4,10 +4,10 @@ import { allowedLanguages, buildDict, guessMapping, normName, normText, stripTag
 import { authConfigured } from '../shared/config';
 import type { DocConfig, GoogleAuth, Mapping, SameRef, ScopeInfo, PlanInfo, Report, ReportSource, Scope, SelectionInfo, SourceMeta, Table } from '../shared/types';
 import { send } from './bridge';
-import { CopyButton, Icon, ReportView, Seg } from './components';
+import { CopyButton, Icon, ReportView, Seg, copyText } from './components';
 import { LOCALES, type Locale, type MsgKey, type T } from './i18n';
 import type { Scope as ScopeT } from '../shared/types';
-import { SAMPLE_CSV, SheetError, detectHeaderRow, fetchGoogleSheet, parseCsv, parseSheetUrl, toTable } from './sheet';
+import { APPS_SCRIPT, SAMPLE_CSV, SheetError, detectHeaderRow, fetchGoogleSheet, fetchScriptTabs, isScriptUrl, parseCsv, parseSheetUrl, scriptUrlWithGid, toTable } from './sheet';
 import { GoogleError, fetchTab, freshAuth, listTabs, revoke, signInAndPick, type Tab } from './google';
 
 export function errorText(e: unknown, t: T): string {
@@ -132,9 +132,27 @@ export function SourceView(p: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [scriptTabs, setScriptTabs] = useState<{ id: number; title: string }[] | null>(null);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const connectScript = async (input: string, gidPick?: number) => {
+    const ref = parseSheetUrl(input)!;
+    setStatus('loading');
+    try {
+      const list = await fetchScriptTabs(ref);
+      setScriptTabs(list);
+      const tab = list.find((x) => String(x.id) === String(gidPick ?? ref.gid)) ?? list[0];
+      const u = scriptUrlWithGid(input, tab?.id ?? 0);
+      setUrl(u);
+      const raw = await fetchGoogleSheet(parseSheetUrl(u)!);
+      const table = toTable(raw, detectHeaderRow(raw));
+      accept(table, { kind: 'google', url: u, label: `Google Sheet · ${tab?.title ?? ''}`, sheetTitle: tab?.title, fetchedAt: Date.now(), rowCount: table.rows.length });
+    } catch (e) { fail(e); }
+  };
+
   const connectGoogle = async () => {
     const ref = parseSheetUrl(url);
     if (!ref) return fail(new SheetError('invalid-url'));
+    if (ref.script) return connectScript(url);
     const gid = Number(ref.gid);
     // Signed in → try the API first (works for private/company sheets the user already picked)
     if (p.auth && !ref.published) {
@@ -234,9 +252,22 @@ export function SourceView(p: {
               </div>
               {p.auth
                 ? <span className="small muted">{t('signedInAs', { email: p.auth.email || 'Google' })}</span>
-                : <span className="small muted">{t('privateDesc')}</span>}
+                : <span className="small muted">{t(authConfigured() ? 'privateDesc' : 'scriptDesc')}</span>}
               {!authConfigured() ? (
-                <div className="note warn">{t('authNotConfigured')}</div>
+                <details className="script-guide" open={!config.source || (status === 'error' && errCode === 'not-shared')}>
+                  <summary>{t('scriptTitle')}</summary>
+                  <ol className="steps">
+                    <li>{t('script1')}</li>
+                    <li>{t('script2')}
+                      <button className="btn sm" style={{ marginLeft: 6 }} onClick={() => { copyText(APPS_SCRIPT); setCodeCopied(true); setTimeout(() => setCodeCopied(false), 1500); }}>
+                        <Icon name={codeCopied ? 'check' : 'copy'} size={12} />{codeCopied ? t('copied') : t('copyCode')}
+                      </button>
+                    </li>
+                    <li>{t('script3')}</li>
+                    <li>{t('script4')}</li>
+                  </ol>
+                  <p className="small muted">{t('scriptNote')}</p>
+                </details>
               ) : signing ? (
                 <div className="note row"><Icon name="refresh" className="spin" size={14} /><span className="grow">{t('waitingBrowser')}</span>
                   <button className="btn sm" onClick={() => { signal.current.cancelled = true; setSigning(false); }}>{t('cancel')}</button></div>
@@ -244,6 +275,14 @@ export function SourceView(p: {
                 <button className="btn google" onClick={() => pick()}>
                   <GoogleG />{p.auth ? t('chooseSheet') : t('signInGoogle')}
                 </button>
+              )}
+              {scriptTabs && scriptTabs.length > 1 && isScriptUrl(url) && (
+                <div className="field">
+                  <label>{t('tab')}</label>
+                  <select className="select" value={parseSheetUrl(url)?.gid || scriptTabs[0].id} onChange={(e) => connectScript(url, Number(e.target.value))}>
+                    {scriptTabs.map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}
+                  </select>
+                </div>
               )}
               {apiFile && tabs && tabs.length > 0 && (
                 <div className="field">

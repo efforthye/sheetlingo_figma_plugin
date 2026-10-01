@@ -241,6 +241,14 @@ const en = {
   error: 'Something went wrong: {msg}',
   notifyResync: 'Sheetlingo: {n} updated · {m} missing',
   notifyConnectFirst: 'Sheetlingo: open the plugin and connect a sheet first.',
+  scriptDesc: 'Keep the sheet private. A tiny script inside your sheet lets only Sheetlingo read it. Free, no sign-in, one-time setup.',
+  scriptTitle: 'Connect a private sheet (1 minute)',
+  script1: 'In the sheet: Extensions › Apps Script.',
+  script2: 'Delete everything there, paste the code, and save.',
+  script3: 'Deploy › New deployment › type Web app. Execute as: Me. Who has access: Anyone. Deploy and allow access.',
+  script4: 'Copy the Web app URL (…/exec) and paste it below.',
+  scriptNote: 'The sheet itself stays private; only someone with that URL can read the values. Company accounts: if “Anyone” isn’t offered, your admin blocks it, so use Paste or a personal sheet.',
+  copyCode: 'Copy code',
 };
 
 export default en;
