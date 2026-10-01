@@ -1,6 +1,6 @@
 {
   "name": "sheetlingo",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Sheetlingo — sync Figma text with Google Sheets by key, in any language.",
   "scripts": {
